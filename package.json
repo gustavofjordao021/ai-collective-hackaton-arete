@@ -1,0 +1,14 @@
+{
+  "name": "arete",
+  "version": "0.1.0",
+  "description": "Portable AI identity - Chrome extension",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build"
+  },
+  "devDependencies": {
+    "@crxjs/vite-plugin": "^2.2.1",
+    "vite": "^7.2.6"
+  }
+}

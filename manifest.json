@@ -1,0 +1,11 @@
+{
+  "manifest_version": 3,
+  "name": "Arete",
+  "version": "0.1.0",
+  "description": "Portable AI identity",
+  "permissions": ["storage", "activeTab"],
+  "content_scripts": [{
+    "matches": ["<all_urls>"],
+    "js": ["src/content.js"]
+  }]
+}
