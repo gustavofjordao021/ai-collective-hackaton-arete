@@ -18,6 +18,8 @@ async function extractIdentityWithLLM(prose) {
       (response) => {
         if (chrome.runtime.lastError) {
           reject(new Error(chrome.runtime.lastError.message));
+        } else if (!response) {
+          reject(new Error('No response from background script'));
         } else if (!response.success) {
           reject(new Error(response.error || 'Extraction failed'));
         } else {

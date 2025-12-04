@@ -8,12 +8,15 @@
   ],
   "scripts": {
     "dev": "vite",
-    "build": "npm run build:core && vite build",
+    "build": "npm run build:packages && vite build",
+    "build:packages": "npm run build:core && npm run build:memory",
     "build:core": "npm run build -w @arete/core",
+    "build:memory": "npm run build -w @arete/memory",
     "test": "vitest run --config vitest.extension.config.ts",
     "test:watch": "vitest --config vitest.extension.config.ts",
-    "test:core": "npm test -w @arete/core",
-    "test:all": "npm run test:core && npm run test",
+    "test:core": "npm test --workspace=@arete/core",
+    "test:memory": "npm test --workspace=@arete/memory",
+    "test:all": "npm test --workspace=@arete/core && npm test --workspace=@arete/memory && npm run test",
     "cli": "node packages/core/dist/cli/index.js"
   },
   "devDependencies": {

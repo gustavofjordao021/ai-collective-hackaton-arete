@@ -80,6 +80,15 @@ async function extractIdentityWithLLM(prose) {
   }
 
   const data = await response.json();
+
+  // Validate response structure
+  if (!data.content || !Array.isArray(data.content) || data.content.length === 0) {
+    throw new Error('Invalid API response: missing or empty content array');
+  }
+  if (!data.content[0].text) {
+    throw new Error('Invalid API response: missing text in content');
+  }
+
   const content = data.content[0].text;
 
   // Parse JSON from response (handle potential markdown fencing)
