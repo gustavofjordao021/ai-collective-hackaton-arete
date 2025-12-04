@@ -21,7 +21,9 @@ export {
 // Extraction
 export {
   buildExtractionPrompt,
+  buildExtractionPromptV2,
   buildFactExtractionPrompt,
+  IDENTITY_EXTRACTION_PROMPT_V2,
   extractIdentityFromText,
   mergeIdentity,
   type LLMProvider,

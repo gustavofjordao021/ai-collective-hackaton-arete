@@ -45,6 +45,68 @@ Output valid JSON matching this structure (omit empty arrays/objects):
 }`;
 
 /**
+ * Optimized prompt for identity extraction using Claude
+ * Uses XML tags and examples for better accuracy (Claude best practice)
+ */
+export const IDENTITY_EXTRACTION_PROMPT_V2 = `You are an identity extraction system. Extract structured information from user-provided text.
+
+<instructions>
+- Extract ONLY information explicitly stated or clearly implied
+- Use empty strings for missing text fields, empty arrays for missing lists
+- Be concise - capture essence, not verbatim quotes
+- Preserve the user's voice in communication preferences
+- Output ONLY valid JSON - no markdown, no explanation
+- The output will be parsed with JSON.parse() so it must be valid
+</instructions>
+
+<schema>
+{
+  "core": {
+    "name": "string - full name if mentioned",
+    "role": "string - job title and company",
+    "location": "string - city/country",
+    "background": "string - brief professional/personal summary (max 50 words)"
+  },
+  "communication": {
+    "style": ["array of preferences: direct, casual, formal, technical, friendly"],
+    "format": ["array of format preferences: bullet points, code examples, detailed, concise"],
+    "avoid": ["array of things to avoid: emojis, fluff, disclaimers, long explanations"]
+  },
+  "expertise": ["array of skills, technologies, domains"],
+  "currentFocus": {
+    "projects": [{"name": "string", "description": "string", "status": "active|paused|completed"}],
+    "goals": ["array of current goals"]
+  },
+  "context": {
+    "personal": ["array of personal interests, background, lifestyle"],
+    "professional": ["array of professional context beyond role"]
+  }
+}
+</schema>
+
+<example>
+<input>
+I'm Alex Chen, a senior engineer at Stripe working on payment infrastructure. Based in SF. I work with Go and Python daily. I like concise, technical responses with code examples. Skip the fluff and pleasantries.
+</input>
+<output>
+{"core":{"name":"Alex Chen","role":"Senior Engineer at Stripe","location":"San Francisco","background":"Works on payment infrastructure"},"communication":{"style":["technical","concise"],"format":["code examples"],"avoid":["fluff","pleasantries"]},"expertise":["Go","Python","payment infrastructure"],"currentFocus":{"projects":[],"goals":[]},"context":{"personal":[],"professional":["payment systems"]}}
+</output>
+</example>
+
+<input>
+{input}
+</input>
+
+Output valid JSON only:`;
+
+/**
+ * Fill in the extraction prompt with user input (v2)
+ */
+export function buildExtractionPromptV2(input: string): string {
+  return IDENTITY_EXTRACTION_PROMPT_V2.replace("{input}", input);
+}
+
+/**
  * Prompt for extracting facts from conversation
  */
 export const FACT_EXTRACTION_PROMPT = `You are a fact extractor. Given a conversation exchange, extract any NEW facts learned about the user.

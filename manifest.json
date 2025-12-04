@@ -4,6 +4,10 @@
   "version": "0.1.0",
   "description": "Portable AI identity",
   "permissions": ["storage", "activeTab"],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
   "content_scripts": [{
     "matches": ["<all_urls>"],
     "js": ["src/content.js"]

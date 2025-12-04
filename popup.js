@@ -1,10 +1,70 @@
 const PREFIX = 'arete_';
+const IDENTITY_KEY = 'arete_identity';
 
 // Memory limits (sync with manager.js)
 const LIMITS = {
   maxFacts: 50,
   maxPages: 20,
 };
+
+/**
+ * Extract identity from prose using LLM via background script
+ * Uses Claude Haiku for accurate natural language understanding
+ */
+async function extractIdentityWithLLM(prose) {
+  return new Promise((resolve, reject) => {
+    chrome.runtime.sendMessage(
+      { type: 'EXTRACT_IDENTITY', prose },
+      (response) => {
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+        } else if (!response.success) {
+          reject(new Error(response.error || 'Extraction failed'));
+        } else {
+          // Wrap extracted data in full identity structure
+          const extracted = response.identity;
+          const identity = {
+            meta: {
+              version: "1.0.0",
+              lastModified: new Date().toISOString(),
+              deviceId: "browser",
+            },
+            core: extracted.core || {},
+            communication: extracted.communication || { style: [], format: [], avoid: [] },
+            expertise: extracted.expertise || [],
+            currentFocus: extracted.currentFocus || { projects: [], goals: [] },
+            context: extracted.context || { personal: [], professional: [] },
+            privacy: { public: [], private: [], localOnly: [] },
+            custom: {},
+            sources: [{ field: "all", source: "user_input", confidence: "high", timestamp: new Date().toISOString() }],
+          };
+          resolve(identity);
+        }
+      }
+    );
+  });
+}
+
+function formatIdentityForDisplay(identity) {
+  if (!identity || !identity.core) {
+    return 'No identity configured yet.\n\nClick "Edit" to set up your identity.';
+  }
+
+  const parts = [];
+
+  if (identity.core.name) parts.push(`Name: ${identity.core.name}`);
+  if (identity.core.role) parts.push(`Role: ${identity.core.role}`);
+  if (identity.core.location) parts.push(`Location: ${identity.core.location}`);
+  if (identity.core.background) parts.push(`Background: ${identity.core.background}`);
+  if (identity.expertise?.length > 0) parts.push(`Expertise: ${identity.expertise.join(', ')}`);
+  if (identity.communication?.style?.length > 0) parts.push(`Style: ${identity.communication.style.join(', ')}`);
+  if (identity.communication?.avoid?.length > 0) parts.push(`Avoid: ${identity.communication.avoid.join(', ')}`);
+  if (identity.currentFocus?.projects?.length > 0) {
+    parts.push(`Projects: ${identity.currentFocus.projects.map(p => p.name).join(', ')}`);
+  }
+
+  return parts.length > 0 ? parts.join('\n') : 'No identity details yet.';
+}
 
 async function getAllStorage() {
   return new Promise((resolve, reject) => {
@@ -64,14 +124,9 @@ async function loadStats() {
       factsList.innerHTML = '<div class="no-facts">No facts learned yet. Chat with the AI to build your memory!</div>';
     }
 
-    // Show identity
-    const identity = `Name: Gustavo Jordão
-Role: Senior PM at PayNearMe (fintech)
-Technical: React, Next.js, TypeScript, Node.js
-Location: Miami, FL → Lisbon 2025
-Style: Direct, concise, bullet points
-Focus: AI tooling, portable identity`;
-    document.getElementById('identity-preview').textContent = identity;
+    // Show identity from storage
+    const identity = all[IDENTITY_KEY];
+    document.getElementById('identity-preview').textContent = formatIdentityForDisplay(identity);
   } catch (err) {
     console.error('Arete popup error:', err);
   }
@@ -136,9 +191,76 @@ async function clearAll() {
   }
 }
 
+// Tab switching
+function setupTabs() {
+  const tabView = document.getElementById('tab-view');
+  const tabEdit = document.getElementById('tab-edit');
+  const viewPanel = document.getElementById('view-panel');
+  const editPanel = document.getElementById('edit-panel');
+
+  tabView.addEventListener('click', () => {
+    tabView.classList.add('active');
+    tabEdit.classList.remove('active');
+    viewPanel.style.display = 'block';
+    editPanel.style.display = 'none';
+  });
+
+  tabEdit.addEventListener('click', () => {
+    tabEdit.classList.add('active');
+    tabView.classList.remove('active');
+    editPanel.style.display = 'block';
+    viewPanel.style.display = 'none';
+  });
+}
+
+// Save identity from prose
+async function saveIdentity() {
+  const input = document.getElementById('identity-input');
+  const status = document.getElementById('save-status');
+  const btn = document.getElementById('save-identity-btn');
+
+  const prose = input.value.trim();
+  if (!prose) {
+    status.textContent = 'Please enter something about yourself';
+    status.className = 'save-status error';
+    return;
+  }
+
+  btn.disabled = true;
+  status.textContent = 'Analyzing with AI...';
+  status.className = 'save-status loading';
+
+  try {
+    // Extract identity using LLM (Claude Haiku)
+    const identity = await extractIdentityWithLLM(prose);
+
+    // Save to storage
+    await chrome.storage.local.set({ [IDENTITY_KEY]: identity });
+
+    // Update display
+    document.getElementById('identity-preview').textContent = formatIdentityForDisplay(identity);
+
+    status.textContent = '✓ Identity saved! Reload any page to use it.';
+    status.className = 'save-status success';
+
+    // Switch back to view tab after 1.5s
+    setTimeout(() => {
+      document.getElementById('tab-view').click();
+    }, 1500);
+  } catch (err) {
+    console.error('Save error:', err);
+    status.textContent = 'Failed to save: ' + err.message;
+    status.className = 'save-status error';
+  } finally {
+    btn.disabled = false;
+  }
+}
+
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
   await loadStats();
+  setupTabs();
+  document.getElementById('save-identity-btn').addEventListener('click', saveIdentity);
   document.getElementById('export-btn').addEventListener('click', exportData);
   document.getElementById('import-btn').addEventListener('click', importData);
   document.getElementById('clear-btn').addEventListener('click', clearAll);

@@ -1,8 +1,10 @@
 import { describe, it, expect } from "vitest";
 import {
   buildExtractionPrompt,
+  buildExtractionPromptV2,
   buildFactExtractionPrompt,
   IDENTITY_EXTRACTION_PROMPT,
+  IDENTITY_EXTRACTION_PROMPT_V2,
 } from "./prompts.js";
 import {
   extractIdentityFromText,
@@ -25,6 +27,56 @@ describe("buildExtractionPrompt", () => {
 
     expect(result).toContain("identity extraction system");
     expect(result).toContain("Output valid JSON");
+  });
+});
+
+describe("buildExtractionPromptV2", () => {
+  it("inserts user input into XML input tags", () => {
+    const result = buildExtractionPromptV2("I am a Senior PM at PayNearMe");
+
+    expect(result).toContain("<input>");
+    expect(result).toContain("I am a Senior PM at PayNearMe");
+    expect(result).toContain("</input>");
+  });
+
+  it("uses XML tags for structure (Claude best practice)", () => {
+    const result = buildExtractionPromptV2("test");
+
+    expect(result).toContain("<instructions>");
+    expect(result).toContain("</instructions>");
+    expect(result).toContain("<schema>");
+    expect(result).toContain("</schema>");
+    expect(result).toContain("<example>");
+    expect(result).toContain("</example>");
+  });
+
+  it("includes explicit JSON parsing instruction", () => {
+    const result = buildExtractionPromptV2("test");
+
+    expect(result).toContain("JSON.parse()");
+    expect(result).toContain("valid JSON");
+  });
+
+  it("includes example for better extraction accuracy", () => {
+    const result = buildExtractionPromptV2("test");
+
+    expect(result).toContain("Alex Chen");
+    expect(result).toContain("Stripe");
+    expect(result).toContain("<output>");
+    expect(result).toContain("</output>");
+  });
+
+  it("specifies all schema fields", () => {
+    const result = buildExtractionPromptV2("test");
+
+    expect(result).toContain('"core"');
+    expect(result).toContain('"communication"');
+    expect(result).toContain('"expertise"');
+    expect(result).toContain('"currentFocus"');
+    expect(result).toContain('"context"');
+    expect(result).toContain('"style"');
+    expect(result).toContain('"format"');
+    expect(result).toContain('"avoid"');
   });
 });
 

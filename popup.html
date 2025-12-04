@@ -146,10 +146,68 @@
       font-size: 11px;
       color: #7d8590;
       line-height: 1.5;
-      max-height: 100px;
+      max-height: 120px;
       overflow-y: auto;
       white-space: pre-wrap;
     }
+    .identity-tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .tab {
+      padding: 6px 14px;
+      border: 1px solid rgba(110, 118, 129, 0.3);
+      border-radius: 6px;
+      background: transparent;
+      color: #7d8590;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .tab:hover { background: rgba(110, 118, 129, 0.15); }
+    .tab.active {
+      background: rgba(45, 212, 191, 0.15);
+      border-color: rgba(45, 212, 191, 0.3);
+      color: #2dd4bf;
+    }
+    .identity-input {
+      width: 100%;
+      min-height: 120px;
+      padding: 12px;
+      border: 1px solid rgba(110, 118, 129, 0.3);
+      border-radius: 10px;
+      background: rgba(110, 118, 129, 0.1);
+      color: #e6edf3;
+      font-size: 12px;
+      font-family: inherit;
+      line-height: 1.5;
+      resize: vertical;
+    }
+    .identity-input:focus {
+      outline: none;
+      border-color: rgba(45, 212, 191, 0.5);
+    }
+    .identity-input::placeholder { color: #484f58; }
+    .edit-buttons { margin-top: 10px; }
+    .btn-primary {
+      background: linear-gradient(135deg, #2dd4bf 0%, #14b8a6 100%);
+      color: #0d1117;
+      width: 100%;
+    }
+    .btn-primary:hover { opacity: 0.9; }
+    .btn-primary:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .save-status {
+      font-size: 11px;
+      margin-top: 8px;
+      text-align: center;
+    }
+    .save-status.success { color: #2dd4bf; }
+    .save-status.error { color: #f85149; }
+    .save-status.loading { color: #7d8590; }
 
     .hotkeys {
       display: flex;
@@ -209,8 +267,24 @@
   </div>
 
   <div class="section">
-    <div class="section-title">Core Identity</div>
-    <div class="identity-preview" id="identity-preview">Loading...</div>
+    <div class="section-title">Your Identity</div>
+    <div class="identity-tabs">
+      <button class="tab active" id="tab-view">View</button>
+      <button class="tab" id="tab-edit">Edit</button>
+    </div>
+    <div id="view-panel">
+      <div class="identity-preview" id="identity-preview">Loading...</div>
+    </div>
+    <div id="edit-panel" style="display: none;">
+      <textarea class="identity-input" id="identity-input" placeholder="Tell me about yourself...
+
+Example:
+I'm Alex, a senior engineer at a fintech startup. I work with TypeScript and React. I prefer direct, concise responses with code examples. Skip the fluff."></textarea>
+      <div class="edit-buttons">
+        <button class="btn btn-primary" id="save-identity-btn">Save Identity</button>
+      </div>
+      <div class="save-status" id="save-status"></div>
+    </div>
   </div>
 
   <div class="section">
