@@ -5,7 +5,7 @@
   "description": "Portable AI identity",
   "permissions": ["storage", "activeTab", "identity"],
   "oauth2": {
-    "client_id": "YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com",
+    "client_id": "491689150880-2385irnfjnq7e4nauppg4c2rkgqh41fm.apps.googleusercontent.com",
     "scopes": ["openid", "email", "profile"]
   },
   "background": {
