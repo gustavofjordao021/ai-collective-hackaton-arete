@@ -1,4 +1,4 @@
-import { identity } from './identity.js';
+import { getIdentityForModel } from './identity/index.ts';
 import { getFactsForPrompt } from './memory/facts.js';
 import { getBrowsingContext } from './memory/pages.js';
 
@@ -31,11 +31,15 @@ function getAISite() {
  * Build the context to inject
  */
 async function buildContext() {
+  const site = getAISite();
+  const model = site?.name === 'Claude' ? 'claude' : 'openai';
+
+  const identityPrompt = await getIdentityForModel(model);
   const facts = await getFactsForPrompt();
   const browsing = await getBrowsingContext();
 
   return `[Context from Arete - my portable AI identity]
-${identity.core}${facts}${browsing}
+${identityPrompt}${facts}${browsing}
 
 ---
 My question:`;

@@ -2,306 +2,175 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      width: 380px;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: linear-gradient(165deg, #0d1117 0%, #161b22 50%, #0d1117 100%);
-      color: #e6edf3;
-      padding: 20px;
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            arete: {
+              bg: '#fafafa',
+              surface: '#f5f5f5',
+              border: '#e5e5e5',
+              'border-hover': '#d4d4d4',
+              text: '#171717',
+              'text-secondary': '#525252',
+              'text-tertiary': '#a3a3a3',
+              accent: '#0d9488',
+              'accent-light': '#ccfbf1',
+            }
+          },
+          fontFamily: {
+            serif: ['Instrument Serif', 'Georgia', 'serif'],
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+            mono: ['JetBrains Mono', 'ui-monospace', 'monospace'],
+          },
+        },
+      },
     }
-    .header {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      margin-bottom: 20px;
-      padding-bottom: 16px;
-      border-bottom: 1px solid rgba(48, 54, 61, 0.8);
-    }
-    .logo {
-      width: 36px;
-      height: 36px;
-      background: linear-gradient(135deg, #2dd4bf 0%, #14b8a6 100%);
-      border-radius: 10px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 18px;
-    }
-    .title { font-size: 18px; font-weight: 600; }
-    .subtitle { font-size: 12px; color: #7d8590; }
-
-    .section {
-      margin-bottom: 20px;
-    }
-    .section-title {
-      font-size: 11px;
-      font-weight: 600;
-      color: #7d8590;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      margin-bottom: 10px;
-    }
-
-    .stats {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 10px;
-    }
-    .stat {
-      background: rgba(110, 118, 129, 0.1);
-      border: 1px solid rgba(110, 118, 129, 0.2);
-      border-radius: 10px;
-      padding: 12px;
-      text-align: center;
-    }
-    .stat-value {
-      font-size: 24px;
-      font-weight: 600;
-      color: #2dd4bf;
-      display: inline;
-    }
-    .stat-limit {
-      font-size: 12px;
-      color: #7d8590;
-    }
-    .stat-label {
-      font-size: 11px;
-      color: #7d8590;
-      margin-top: 4px;
-    }
-    .progress-bar {
-      width: 100%;
-      height: 4px;
-      background: rgba(110, 118, 129, 0.2);
-      border-radius: 2px;
-      margin-top: 8px;
-      overflow: hidden;
-    }
-    .progress-fill {
-      height: 100%;
-      background: #2dd4bf;
-      border-radius: 2px;
-      transition: width 0.3s, background 0.3s;
-    }
-    .storage-info {
-      text-align: center;
-      font-size: 11px;
-      color: #7d8590;
-      margin-top: 10px;
-    }
-
-    .facts-list {
-      max-height: 120px;
-      overflow-y: auto;
-      background: rgba(110, 118, 129, 0.1);
-      border: 1px solid rgba(110, 118, 129, 0.2);
-      border-radius: 10px;
-      padding: 12px;
-    }
-    .fact {
-      font-size: 12px;
-      color: #e6edf3;
-      padding: 6px 0;
-      border-bottom: 1px solid rgba(110, 118, 129, 0.15);
-    }
-    .fact:last-child { border-bottom: none; }
-    .no-facts {
-      font-size: 12px;
-      color: #7d8590;
-      font-style: italic;
-    }
-
-    .buttons {
-      display: flex;
-      gap: 10px;
-    }
-    .btn {
-      flex: 1;
-      padding: 10px 16px;
-      border: none;
-      border-radius: 8px;
-      font-size: 13px;
-      font-weight: 500;
-      cursor: pointer;
-      transition: all 0.15s;
-    }
-    .btn-secondary {
-      background: rgba(110, 118, 129, 0.2);
-      color: #7d8590;
-    }
-    .btn-secondary:hover { background: rgba(110, 118, 129, 0.3); }
-    .btn-danger {
-      background: rgba(248, 81, 73, 0.15);
-      color: #f85149;
-    }
-    .btn-danger:hover { background: rgba(248, 81, 73, 0.25); }
-
-    .identity-preview {
-      background: rgba(110, 118, 129, 0.1);
-      border: 1px solid rgba(110, 118, 129, 0.2);
-      border-radius: 10px;
-      padding: 12px;
-      font-size: 11px;
-      color: #7d8590;
-      line-height: 1.5;
-      max-height: 120px;
-      overflow-y: auto;
-      white-space: pre-wrap;
-    }
-    .identity-tabs {
-      display: flex;
-      gap: 8px;
-      margin-bottom: 10px;
-    }
-    .tab {
-      padding: 6px 14px;
-      border: 1px solid rgba(110, 118, 129, 0.3);
-      border-radius: 6px;
-      background: transparent;
-      color: #7d8590;
-      font-size: 12px;
-      cursor: pointer;
-      transition: all 0.15s;
-    }
-    .tab:hover { background: rgba(110, 118, 129, 0.15); }
-    .tab.active {
-      background: rgba(45, 212, 191, 0.15);
-      border-color: rgba(45, 212, 191, 0.3);
-      color: #2dd4bf;
-    }
-    .identity-input {
-      width: 100%;
-      min-height: 120px;
-      padding: 12px;
-      border: 1px solid rgba(110, 118, 129, 0.3);
-      border-radius: 10px;
-      background: rgba(110, 118, 129, 0.1);
-      color: #e6edf3;
-      font-size: 12px;
-      font-family: inherit;
-      line-height: 1.5;
-      resize: vertical;
-    }
-    .identity-input:focus {
-      outline: none;
-      border-color: rgba(45, 212, 191, 0.5);
-    }
-    .identity-input::placeholder { color: #484f58; }
-    .edit-buttons { margin-top: 10px; }
-    .btn-primary {
-      background: linear-gradient(135deg, #2dd4bf 0%, #14b8a6 100%);
-      color: #0d1117;
-      width: 100%;
-    }
-    .btn-primary:hover { opacity: 0.9; }
-    .btn-primary:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-    .save-status {
-      font-size: 11px;
-      margin-top: 8px;
-      text-align: center;
-    }
-    .save-status.success { color: #2dd4bf; }
-    .save-status.error { color: #f85149; }
-    .save-status.loading { color: #7d8590; }
-
-    .hotkeys {
-      display: flex;
-      gap: 16px;
-      font-size: 12px;
-      color: #7d8590;
-    }
-    .hotkey {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-    .key {
-      padding: 4px 8px;
-      background: rgba(110, 118, 129, 0.15);
-      border-radius: 4px;
-      font-family: ui-monospace, monospace;
-      font-size: 11px;
-    }
-  </style>
+  </script>
 </head>
-<body>
-  <div class="header">
-    <div class="logo">⚡</div>
-    <div>
-      <div class="title">Arete</div>
-      <div class="subtitle">Portable AI Identity</div>
-    </div>
-  </div>
+<body class="w-[380px] bg-arete-bg font-sans text-arete-text p-5">
 
-  <div class="section">
-    <div class="section-title">Memory Stats</div>
-    <div class="stats">
-      <div class="stat">
-        <div><span class="stat-value" id="facts-count">-</span><span class="stat-limit" id="facts-limit">/50</span></div>
-        <div class="stat-label">Facts</div>
-        <div class="progress-bar"><div class="progress-fill" id="facts-bar" style="width: 0%"></div></div>
+  <!-- Header -->
+  <header class="flex justify-between items-center pb-5 border-b border-arete-border">
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 bg-arete-accent rounded-xl flex items-center justify-center text-white font-serif text-xl">
+        A
       </div>
-      <div class="stat">
-        <div><span class="stat-value" id="pages-count">-</span><span class="stat-limit" id="pages-limit">/20</span></div>
-        <div class="stat-label">Pages</div>
-        <div class="progress-bar"><div class="progress-fill" id="pages-bar" style="width: 0%"></div></div>
-      </div>
-      <div class="stat">
-        <div class="stat-value" id="messages-count">-</div>
-        <div class="stat-label">Messages</div>
+      <div>
+        <h1 class="font-serif text-xl tracking-tight">Arete</h1>
+        <p class="text-xs text-arete-text-tertiary">Your AI, elevated</p>
       </div>
     </div>
-    <div class="storage-info">Total storage: <span id="storage-size">0 KB</span></div>
-  </div>
+    <button id="auth-btn" class="flex items-center gap-2 px-4 py-2 border border-arete-border rounded-lg text-sm font-medium hover:border-arete-border-hover hover:bg-arete-surface transition-colors">
+      Sign in
+    </button>
+  </header>
 
-  <div class="section">
-    <div class="section-title">Learned Facts</div>
-    <div class="facts-list" id="facts-list">
-      <div class="no-facts">No facts learned yet</div>
+  <!-- Stats Section -->
+  <section class="mt-6">
+    <div class="flex items-center gap-2 mb-4">
+      <span class="text-xs font-mono text-arete-text-tertiary">01</span>
+      <span class="text-xs text-arete-text-tertiary">::</span>
+      <span class="text-xs font-semibold uppercase tracking-wider text-arete-text-secondary">Memory Stats</span>
     </div>
-  </div>
+    <div class="grid grid-cols-3 gap-3" id="stats-grid">
+      <!-- Facts Card -->
+      <div class="bg-arete-surface border border-arete-border rounded-xl p-4 hover:border-arete-border-hover transition-colors">
+        <div class="flex items-baseline gap-1">
+          <span class="font-mono text-2xl font-medium" id="facts-count">-</span>
+          <span class="font-mono text-xs text-arete-text-tertiary" id="facts-limit">/50</span>
+        </div>
+        <p class="text-xs text-arete-text-tertiary mt-1">Facts</p>
+        <div class="h-1 bg-arete-border rounded-full mt-3 overflow-hidden">
+          <div class="h-full bg-arete-accent rounded-full transition-all" id="facts-bar" style="width: 0%"></div>
+        </div>
+      </div>
 
-  <div class="section">
-    <div class="section-title">Your Identity</div>
-    <div class="identity-tabs">
-      <button class="tab active" id="tab-view">View</button>
-      <button class="tab" id="tab-edit">Edit</button>
+      <!-- Pages Card -->
+      <div class="bg-arete-surface border border-arete-border rounded-xl p-4 hover:border-arete-border-hover transition-colors">
+        <div class="flex items-baseline gap-1">
+          <span class="font-mono text-2xl font-medium" id="pages-count">-</span>
+          <span class="font-mono text-xs text-arete-text-tertiary" id="pages-limit">/20</span>
+        </div>
+        <p class="text-xs text-arete-text-tertiary mt-1">Pages</p>
+        <div class="h-1 bg-arete-border rounded-full mt-3 overflow-hidden">
+          <div class="h-full bg-arete-accent rounded-full transition-all" id="pages-bar" style="width: 0%"></div>
+        </div>
+      </div>
+
+      <!-- Messages Card -->
+      <div class="bg-arete-accent-light border border-arete-accent/30 rounded-xl p-4">
+        <div class="flex items-baseline gap-1">
+          <span class="font-mono text-2xl font-medium text-arete-accent" id="messages-count">-</span>
+        </div>
+        <p class="text-xs text-arete-accent mt-1">Messages</p>
+      </div>
     </div>
+    <p class="text-center text-[10px] text-arete-text-tertiary mt-3">
+      Storage: <span id="storage-size">0 KB</span>
+    </p>
+  </section>
+
+  <!-- Facts Section -->
+  <section class="mt-6">
+    <div class="flex items-center gap-2 mb-4">
+      <span class="text-xs font-mono text-arete-text-tertiary">02</span>
+      <span class="text-xs text-arete-text-tertiary">::</span>
+      <span class="text-xs font-semibold uppercase tracking-wider text-arete-text-secondary">Learned Facts</span>
+    </div>
+    <div class="bg-arete-surface border border-arete-border rounded-xl max-h-32 overflow-y-auto" id="facts-list">
+      <p class="px-4 py-8 text-center text-sm text-arete-text-tertiary italic">No facts learned yet</p>
+    </div>
+  </section>
+
+  <!-- Identity Section -->
+  <section class="mt-6">
+    <div class="flex items-center justify-between mb-4">
+      <div class="flex items-center gap-2">
+        <span class="text-xs font-mono text-arete-text-tertiary">03</span>
+        <span class="text-xs text-arete-text-tertiary">::</span>
+        <span class="text-xs font-semibold uppercase tracking-wider text-arete-text-secondary">Identity</span>
+      </div>
+      <div class="flex bg-arete-surface rounded-lg p-1" id="identity-tabs">
+        <button class="tab-btn px-3 py-1.5 text-xs font-medium rounded-md bg-white shadow-sm text-arete-text" id="tab-view" data-tab="view">View</button>
+        <button class="tab-btn px-3 py-1.5 text-xs font-medium rounded-md text-arete-text-tertiary hover:text-arete-text-secondary" id="tab-edit" data-tab="edit">Edit</button>
+      </div>
+    </div>
+
     <div id="view-panel">
-      <div class="identity-preview" id="identity-preview">Loading...</div>
+      <div class="bg-arete-surface border border-arete-border rounded-xl p-4">
+        <p id="identity-preview" class="text-sm text-arete-text-secondary whitespace-pre-wrap leading-relaxed">Loading...</p>
+      </div>
     </div>
-    <div id="edit-panel" style="display: none;">
-      <textarea class="identity-input" id="identity-input" placeholder="Tell me about yourself...
+
+    <div id="edit-panel" class="hidden">
+      <textarea
+        id="identity-input"
+        class="w-full min-h-[140px] p-4 bg-arete-surface border border-arete-border rounded-xl text-sm resize-y focus:outline-none focus:border-arete-accent focus:ring-2 focus:ring-arete-accent/20"
+        placeholder="Tell me about yourself...
 
 Example:
-I'm Alex, a senior engineer at a fintech startup. I work with TypeScript and React. I prefer direct, concise responses with code examples. Skip the fluff."></textarea>
-      <div class="edit-buttons">
-        <button class="btn btn-primary" id="save-identity-btn">Save Identity</button>
+I'm Alex, a senior engineer at a fintech startup. I work with TypeScript and React. I prefer direct, concise responses with code examples."
+      ></textarea>
+      <button id="save-identity-btn" class="w-full mt-3 py-3 bg-arete-accent text-white font-medium rounded-xl hover:bg-arete-accent/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+        Save Identity
+      </button>
+      <p id="save-status" class="text-xs text-center mt-2"></p>
+    </div>
+  </section>
+
+  <!-- Actions Section -->
+  <section class="mt-6">
+    <div class="flex items-center gap-2 mb-4">
+      <span class="text-xs font-mono text-arete-text-tertiary">04</span>
+      <span class="text-xs text-arete-text-tertiary">::</span>
+      <span class="text-xs font-semibold uppercase tracking-wider text-arete-text-secondary">Actions</span>
+    </div>
+    <div class="flex gap-3">
+      <button id="export-btn" class="flex-1 py-2.5 px-4 border border-arete-border rounded-lg text-sm font-medium text-arete-text-secondary hover:border-arete-border-hover hover:bg-arete-surface transition-colors">Export</button>
+      <button id="import-btn" class="flex-1 py-2.5 px-4 border border-arete-border rounded-lg text-sm font-medium text-arete-text-secondary hover:border-arete-border-hover hover:bg-arete-surface transition-colors">Import</button>
+      <button id="clear-btn" class="flex-1 py-2.5 px-4 border border-red-200 rounded-lg text-sm font-medium text-red-500 hover:border-red-300 hover:bg-red-50 transition-colors">Clear</button>
+    </div>
+  </section>
+
+  <!-- Hotkeys Footer -->
+  <footer class="mt-6 pt-4 border-t border-arete-border">
+    <div class="flex gap-6 text-xs text-arete-text-tertiary">
+      <div class="flex items-center gap-2">
+        <kbd class="px-2 py-1 bg-arete-surface border border-arete-border rounded font-mono text-[10px]">Cmd+Shift+O</kbd>
+        <span>Open overlay</span>
       </div>
-      <div class="save-status" id="save-status"></div>
+      <div class="flex items-center gap-2">
+        <kbd class="px-2 py-1 bg-arete-surface border border-arete-border rounded font-mono text-[10px]">Cmd+Shift+I</kbd>
+        <span>Inject identity</span>
+      </div>
     </div>
-  </div>
-
-  <div class="section">
-    <div class="section-title">Hotkeys</div>
-    <div class="hotkeys">
-      <div class="hotkey"><span class="key">⌘⇧O</span> Open overlay</div>
-      <div class="hotkey"><span class="key">⌘⇧I</span> Inject identity</div>
-    </div>
-  </div>
-
-  <div class="section">
-    <div class="buttons">
-      <button class="btn btn-secondary" id="export-btn">Export</button>
-      <button class="btn btn-secondary" id="import-btn">Import</button>
-      <button class="btn btn-danger" id="clear-btn">Clear All</button>
-    </div>
-  </div>
+  </footer>
 
   <script src="popup.js"></script>
 </body>

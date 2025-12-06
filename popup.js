@@ -7,6 +7,10 @@ const LIMITS = {
   maxPages: 20,
 };
 
+// Tailwind class constants for tab states
+const TAB_ACTIVE_CLASSES = ['bg-white', 'shadow-sm', 'text-arete-text'];
+const TAB_INACTIVE_CLASSES = ['text-arete-text-tertiary', 'hover:text-arete-text-secondary'];
+
 /**
  * Extract identity from prose using LLM via background script
  * Uses Claude Haiku for accurate natural language understanding
@@ -114,16 +118,18 @@ async function loadStats() {
     const totalKb = (totalBytes / 1024).toFixed(1);
     document.getElementById('storage-size').textContent = `${totalKb} KB`;
 
-    // Show facts
+    // Show facts with Tailwind classes
     const factsList = document.getElementById('facts-list');
     if (facts.length > 0) {
-      factsList.innerHTML = facts
-        .slice(-10)
-        .reverse()
-        .map(f => `<div class="fact">${f.fact || f}</div>`)
-        .join('');
+      factsList.innerHTML = '<div class="divide-y divide-arete-border">' +
+        facts
+          .slice(-10)
+          .reverse()
+          .map(f => `<div class="px-4 py-3 text-sm text-arete-text">${f.fact || f}</div>`)
+          .join('') +
+        '</div>';
     } else {
-      factsList.innerHTML = '<div class="no-facts">No facts learned yet. Chat with the AI to build your memory!</div>';
+      factsList.innerHTML = '<p class="px-4 py-8 text-center text-sm text-arete-text-tertiary italic">No facts learned yet. Chat with the AI to build your memory!</p>';
     }
 
     // Show identity from storage
@@ -138,26 +144,41 @@ function updateProgressBar(id, percent) {
   const bar = document.getElementById(id);
   if (bar) {
     bar.style.width = `${Math.min(percent, 100)}%`;
-    // Change color based on usage
+    // Change color based on usage using Tailwind color classes
+    bar.classList.remove('bg-arete-accent', 'bg-amber-500', 'bg-red-500');
     if (percent >= 90) {
-      bar.style.background = '#f85149'; // Red when almost full
+      bar.classList.add('bg-red-500');
     } else if (percent >= 70) {
-      bar.style.background = '#d29922'; // Yellow when getting full
+      bar.classList.add('bg-amber-500');
     } else {
-      bar.style.background = '#2dd4bf'; // Normal teal
+      bar.classList.add('bg-arete-accent');
     }
   }
 }
 
 async function exportData() {
   const all = await getAllStorage();
-  const data = JSON.stringify(all, null, 2);
+
+  // Format for CLI import compatibility
+  const exportPayload = {
+    version: '1.0.0',
+    exportedAt: new Date().toISOString(),
+    source: 'chrome-extension',
+    data: {
+      context_pages: all[`${PREFIX}context_pages`] || [],
+      facts_learned: all[`${PREFIX}facts_learned`] || [],
+      conversation: all['arete_conversation'] || [],
+      identity: all[IDENTITY_KEY] || null,
+    },
+  };
+
+  const data = JSON.stringify(exportPayload, null, 2);
   const blob = new Blob([data], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
 
   const a = document.createElement('a');
   a.href = url;
-  a.download = `arete-backup-${new Date().toISOString().split('T')[0]}.json`;
+  a.download = `arete-export-${new Date().toISOString().split('T')[0]}.json`;
   a.click();
 
   URL.revokeObjectURL(url);
@@ -193,25 +214,33 @@ async function clearAll() {
   }
 }
 
-// Tab switching
+// Tab switching with Tailwind classes
 function setupTabs() {
   const tabView = document.getElementById('tab-view');
   const tabEdit = document.getElementById('tab-edit');
   const viewPanel = document.getElementById('view-panel');
   const editPanel = document.getElementById('edit-panel');
 
+  function setActiveTab(activeTab, inactiveTab) {
+    // Remove all classes first
+    activeTab.classList.remove(...TAB_INACTIVE_CLASSES);
+    inactiveTab.classList.remove(...TAB_ACTIVE_CLASSES);
+
+    // Add appropriate classes
+    activeTab.classList.add(...TAB_ACTIVE_CLASSES);
+    inactiveTab.classList.add(...TAB_INACTIVE_CLASSES);
+  }
+
   tabView.addEventListener('click', () => {
-    tabView.classList.add('active');
-    tabEdit.classList.remove('active');
-    viewPanel.style.display = 'block';
-    editPanel.style.display = 'none';
+    setActiveTab(tabView, tabEdit);
+    viewPanel.classList.remove('hidden');
+    editPanel.classList.add('hidden');
   });
 
   tabEdit.addEventListener('click', () => {
-    tabEdit.classList.add('active');
-    tabView.classList.remove('active');
-    editPanel.style.display = 'block';
-    viewPanel.style.display = 'none';
+    setActiveTab(tabEdit, tabView);
+    editPanel.classList.remove('hidden');
+    viewPanel.classList.add('hidden');
   });
 }
 
@@ -224,13 +253,13 @@ async function saveIdentity() {
   const prose = input.value.trim();
   if (!prose) {
     status.textContent = 'Please enter something about yourself';
-    status.className = 'save-status error';
+    status.className = 'text-xs text-center mt-2 text-red-500';
     return;
   }
 
   btn.disabled = true;
   status.textContent = 'Analyzing with AI...';
-  status.className = 'save-status loading';
+  status.className = 'text-xs text-center mt-2 text-arete-text-tertiary';
 
   try {
     // Extract identity using LLM (Claude Haiku)
@@ -242,8 +271,8 @@ async function saveIdentity() {
     // Update display
     document.getElementById('identity-preview').textContent = formatIdentityForDisplay(identity);
 
-    status.textContent = '✓ Identity saved! Reload any page to use it.';
-    status.className = 'save-status success';
+    status.textContent = 'Identity saved! Reload any page to use it.';
+    status.className = 'text-xs text-center mt-2 text-arete-accent';
 
     // Switch back to view tab after 1.5s
     setTimeout(() => {
@@ -252,7 +281,7 @@ async function saveIdentity() {
   } catch (err) {
     console.error('Save error:', err);
     status.textContent = 'Failed to save: ' + err.message;
-    status.className = 'save-status error';
+    status.className = 'text-xs text-center mt-2 text-red-500';
   } finally {
     btn.disabled = false;
   }
