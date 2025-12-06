@@ -8,7 +8,8 @@
   ],
   "scripts": {
     "dev": "vite",
-    "build": "npm run build:core && npm run build:mcp && vite build",
+    "build": "npm run build:core && npm run build:mcp && npm run build:css && vite build",
+    "build:css": "npx tailwindcss -i ./popup.css -o ./popup.compiled.css --minify",
     "build:core": "npm run build -w @arete/core",
     "build:mcp": "npm run build -w @arete/mcp-server",
     "test": "vitest run --config vitest.extension.config.ts",
@@ -21,6 +22,9 @@
   },
   "devDependencies": {
     "@crxjs/vite-plugin": "^2.0.0-beta.27",
+    "autoprefixer": "^10.4.22",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^3.4.18",
     "vite": "^5.4.11",
     "vitest": "^2.1.8"
   },

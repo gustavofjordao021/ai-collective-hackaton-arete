@@ -17,6 +17,7 @@ export default defineConfig({
           // Copy popup files to dist
           copyFileSync('popup.html', 'dist/popup.html');
           copyFileSync('popup.js', 'dist/popup.js');
+          copyFileSync('popup.compiled.css', 'dist/popup.compiled.css');
 
           // Update manifest with popup action
           const manifestPath = 'dist/manifest.json';
