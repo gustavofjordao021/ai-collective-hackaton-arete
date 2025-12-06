@@ -8,16 +8,16 @@
   ],
   "scripts": {
     "dev": "vite",
-    "build": "npm run build:packages && vite build",
-    "build:packages": "npm run build:core && npm run build:memory",
+    "build": "npm run build:core && npm run build:mcp && vite build",
     "build:core": "npm run build -w @arete/core",
-    "build:memory": "npm run build -w @arete/memory",
+    "build:mcp": "npm run build -w @arete/mcp-server",
     "test": "vitest run --config vitest.extension.config.ts",
     "test:watch": "vitest --config vitest.extension.config.ts",
     "test:core": "npm test --workspace=@arete/core",
-    "test:memory": "npm test --workspace=@arete/memory",
-    "test:all": "npm test --workspace=@arete/core && npm test --workspace=@arete/memory && npm run test",
-    "cli": "node packages/core/dist/cli/index.js"
+    "test:mcp": "npm test --workspace=@arete/mcp-server",
+    "test:all": "npm run test:core && npm run test:mcp && npm run test",
+    "cli": "node packages/core/dist/cli/index.js",
+    "mcp": "node packages/mcp-server/dist/index.js"
   },
   "devDependencies": {
     "@crxjs/vite-plugin": "^2.0.0-beta.27",
