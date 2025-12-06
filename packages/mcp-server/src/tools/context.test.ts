@@ -1,0 +1,299 @@
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { existsSync, mkdirSync, rmSync, writeFileSync, readFileSync } from "fs";
+import { join } from "path";
+import { tmpdir } from "os";
+import { randomUUID } from "crypto";
+import {
+  getContextHandler,
+  addContextEventHandler,
+  setConfigDir,
+} from "./context.js";
+
+const TEST_DIR = join(tmpdir(), "arete-mcp-context-test-" + Date.now());
+
+// Generate stable UUIDs for tests
+const UUID_1 = "11111111-1111-1111-1111-111111111111";
+const UUID_2 = "22222222-2222-2222-2222-222222222222";
+const UUID_3 = "33333333-3333-3333-3333-333333333333";
+const UUID_OLD = "00000000-0000-0000-0000-000000000001";
+const UUID_NEW = "00000000-0000-0000-0000-000000000002";
+const UUID_EXISTING = "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee";
+
+describe("arete_get_recent_context tool", () => {
+  beforeEach(() => {
+    if (existsSync(TEST_DIR)) {
+      rmSync(TEST_DIR, { recursive: true });
+    }
+    mkdirSync(TEST_DIR, { recursive: true });
+    setConfigDir(TEST_DIR);
+  });
+
+  afterEach(() => {
+    if (existsSync(TEST_DIR)) {
+      rmSync(TEST_DIR, { recursive: true });
+    }
+  });
+
+  it("returns empty events when no file exists", async () => {
+    const result = await getContextHandler({});
+
+    expect(result.structuredContent.events).toEqual([]);
+    expect(result.structuredContent.count).toBe(0);
+  });
+
+  it("returns events from existing store", async () => {
+    const store = {
+      version: "1.0.0",
+      lastModified: new Date().toISOString(),
+      events: [
+        {
+          id: UUID_1,
+          type: "page_visit",
+          timestamp: new Date().toISOString(),
+          source: "chrome",
+          data: { url: "https://example.com", title: "Test", hostname: "example.com" },
+        },
+        {
+          id: UUID_2,
+          type: "insight",
+          timestamp: new Date().toISOString(),
+          source: "claude-desktop",
+          data: { insight: "User likes TypeScript" },
+        },
+      ],
+    };
+
+    writeFileSync(
+      join(TEST_DIR, "context.json"),
+      JSON.stringify(store, null, 2)
+    );
+
+    const result = await getContextHandler({});
+
+    expect(result.structuredContent.count).toBe(2);
+    expect(result.structuredContent.events.length).toBe(2);
+  });
+
+  it("filters by type", async () => {
+    const store = {
+      version: "1.0.0",
+      lastModified: new Date().toISOString(),
+      events: [
+        {
+          id: UUID_1,
+          type: "page_visit",
+          timestamp: new Date().toISOString(),
+          source: "chrome",
+          data: { url: "https://example.com", title: "Test", hostname: "example.com" },
+        },
+        {
+          id: UUID_2,
+          type: "insight",
+          timestamp: new Date().toISOString(),
+          source: "claude-desktop",
+          data: { insight: "User likes TypeScript" },
+        },
+      ],
+    };
+
+    writeFileSync(
+      join(TEST_DIR, "context.json"),
+      JSON.stringify(store, null, 2)
+    );
+
+    const result = await getContextHandler({ type: "page_visit" });
+
+    expect(result.structuredContent.count).toBe(1);
+    expect(result.structuredContent.events[0].type).toBe("page_visit");
+  });
+
+  it("filters by source", async () => {
+    const store = {
+      version: "1.0.0",
+      lastModified: new Date().toISOString(),
+      events: [
+        {
+          id: UUID_1,
+          type: "page_visit",
+          timestamp: new Date().toISOString(),
+          source: "chrome",
+          data: { url: "https://example.com", title: "Test", hostname: "example.com" },
+        },
+        {
+          id: UUID_2,
+          type: "insight",
+          timestamp: new Date().toISOString(),
+          source: "claude-desktop",
+          data: { insight: "User likes TypeScript" },
+        },
+      ],
+    };
+
+    writeFileSync(
+      join(TEST_DIR, "context.json"),
+      JSON.stringify(store, null, 2)
+    );
+
+    const result = await getContextHandler({ source: "claude-desktop" });
+
+    expect(result.structuredContent.count).toBe(1);
+    expect(result.structuredContent.events[0].source).toBe("claude-desktop");
+  });
+
+  it("respects limit parameter", async () => {
+    const store = {
+      version: "1.0.0",
+      lastModified: new Date().toISOString(),
+      events: [
+        {
+          id: UUID_1,
+          type: "page_visit",
+          timestamp: new Date(Date.now() - 3000).toISOString(),
+          source: "chrome",
+          data: { url: "https://a.com", title: "A", hostname: "a.com" },
+        },
+        {
+          id: UUID_2,
+          type: "page_visit",
+          timestamp: new Date(Date.now() - 2000).toISOString(),
+          source: "chrome",
+          data: { url: "https://b.com", title: "B", hostname: "b.com" },
+        },
+        {
+          id: UUID_3,
+          type: "page_visit",
+          timestamp: new Date(Date.now() - 1000).toISOString(),
+          source: "chrome",
+          data: { url: "https://c.com", title: "C", hostname: "c.com" },
+        },
+      ],
+    };
+
+    writeFileSync(
+      join(TEST_DIR, "context.json"),
+      JSON.stringify(store, null, 2)
+    );
+
+    const result = await getContextHandler({ limit: 2 });
+
+    expect(result.structuredContent.events.length).toBe(2);
+  });
+
+  it("returns events in reverse chronological order", async () => {
+    const store = {
+      version: "1.0.0",
+      lastModified: new Date().toISOString(),
+      events: [
+        {
+          id: UUID_OLD,
+          type: "page_visit",
+          timestamp: new Date(Date.now() - 10000).toISOString(),
+          source: "chrome",
+          data: { url: "https://old.com", title: "Old", hostname: "old.com" },
+        },
+        {
+          id: UUID_NEW,
+          type: "page_visit",
+          timestamp: new Date().toISOString(),
+          source: "chrome",
+          data: { url: "https://new.com", title: "New", hostname: "new.com" },
+        },
+      ],
+    };
+
+    writeFileSync(
+      join(TEST_DIR, "context.json"),
+      JSON.stringify(store, null, 2)
+    );
+
+    const result = await getContextHandler({});
+
+    expect(result.structuredContent.events[0].id).toBe(UUID_NEW);
+    expect(result.structuredContent.events[1].id).toBe(UUID_OLD);
+  });
+});
+
+describe("arete_add_context_event tool", () => {
+  beforeEach(() => {
+    if (existsSync(TEST_DIR)) {
+      rmSync(TEST_DIR, { recursive: true });
+    }
+    mkdirSync(TEST_DIR, { recursive: true });
+    setConfigDir(TEST_DIR);
+  });
+
+  afterEach(() => {
+    if (existsSync(TEST_DIR)) {
+      rmSync(TEST_DIR, { recursive: true });
+    }
+  });
+
+  it("creates event in empty store", async () => {
+    const result = await addContextEventHandler({
+      type: "insight",
+      data: { insight: "User prefers concise code" },
+    });
+
+    expect(result.structuredContent.success).toBe(true);
+    expect(result.structuredContent.event?.type).toBe("insight");
+    expect(result.structuredContent.event?.source).toBe("claude-desktop");
+    expect(result.structuredContent.event?.id).toBeDefined();
+
+    // Verify persistence
+    const stored = JSON.parse(
+      readFileSync(join(TEST_DIR, "context.json"), "utf-8")
+    );
+    expect(stored.events.length).toBe(1);
+  });
+
+  it("appends event to existing store", async () => {
+    const store = {
+      version: "1.0.0",
+      lastModified: new Date().toISOString(),
+      events: [
+        {
+          id: UUID_EXISTING,
+          type: "page_visit",
+          timestamp: new Date().toISOString(),
+          source: "chrome",
+          data: { url: "https://example.com", title: "Test", hostname: "example.com" },
+        },
+      ],
+    };
+
+    writeFileSync(
+      join(TEST_DIR, "context.json"),
+      JSON.stringify(store, null, 2)
+    );
+
+    await addContextEventHandler({
+      type: "insight",
+      data: { insight: "New insight" },
+    });
+
+    const stored = JSON.parse(
+      readFileSync(join(TEST_DIR, "context.json"), "utf-8")
+    );
+    expect(stored.events.length).toBe(2);
+  });
+
+  it("validates event type", async () => {
+    const result = await addContextEventHandler({
+      type: "invalid_type",
+      data: { foo: "bar" },
+    });
+
+    expect(result.structuredContent.success).toBe(false);
+    expect(result.structuredContent.error).toBeDefined();
+  });
+
+  it("allows custom source override", async () => {
+    const result = await addContextEventHandler({
+      type: "insight",
+      source: "custom-source",
+      data: { insight: "Test" },
+    });
+
+    expect(result.structuredContent.event?.source).toBe("custom-source");
+  });
+});

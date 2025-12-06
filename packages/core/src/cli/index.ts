@@ -1,12 +1,17 @@
 #!/usr/bin/env node
 /**
- * Arete CLI - Identity management commands
+ * Arete CLI - Identity and context management
  *
  * Usage:
  *   arete identity get                    Show current identity
  *   arete identity set "prose..."         Extract and store identity from prose
  *   arete identity transform --model X    Output system prompt for model
  *   arete identity clear                  Clear stored identity
+ *
+ *   arete context list                    Show recent context events
+ *   arete context list --type page_visit  Filter by type
+ *   arete context list --limit 5          Limit results
+ *   arete context clear                   Clear all context
  */
 
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs";
@@ -19,6 +24,13 @@ import {
   createOpenAITransform,
   type AreteIdentity,
 } from "../index.js";
+import {
+  listContextEvents,
+  clearContextStore,
+  formatContextList,
+  importFromExtension,
+  type ListContextOptions,
+} from "./context.js";
 
 // Storage location
 const CONFIG_DIR = join(homedir(), ".arete");
@@ -126,9 +138,56 @@ function cmdClear(): void {
   console.log("Identity cleared.");
 }
 
+// Context commands
+function cmdContextList(options: ListContextOptions): void {
+  const events = listContextEvents(options);
+  console.log(formatContextList(events));
+}
+
+function cmdContextClear(): void {
+  clearContextStore();
+  console.log("Context cleared.");
+}
+
+async function cmdContextImport(filePath: string): Promise<void> {
+  if (!filePath) {
+    console.error("Usage: arete context import <path-to-export.json>");
+    process.exit(1);
+  }
+
+  const result = await importFromExtension(filePath);
+
+  if (result.errors.length > 0) {
+    console.error("Errors:");
+    result.errors.forEach((e) => console.error(`  - ${e}`));
+  }
+
+  console.log(`\nImported: ${result.imported} events`);
+  if (result.skipped > 0) {
+    console.log(`Skipped: ${result.skipped} duplicates`);
+  }
+}
+
+function cmdContextHelp(): void {
+  console.log(`
+Context Commands:
+  arete context list                    Show recent context events
+  arete context list --type TYPE        Filter by type (page_visit, selection, insight, etc.)
+  arete context list --source SOURCE    Filter by source (chrome, cli, claude-desktop)
+  arete context list --limit N          Limit results (default: all)
+  arete context clear                   Clear all context events
+  arete context import <file>           Import from Chrome extension export
+
+Examples:
+  arete context list --type page_visit --limit 10
+  arete context list --source chrome
+  arete context import ~/Downloads/arete-export.json
+`);
+}
+
 function cmdHelp(): void {
   console.log(`
-Arete CLI - Portable AI Identity
+Arete CLI - Portable AI Identity & Context
 
 Commands:
   arete identity get                    Show current identity
@@ -137,9 +196,17 @@ Commands:
   arete identity clear                  Clear stored identity
   arete identity json                   Output raw JSON
 
+  arete context list                    Show recent context events
+  arete context list --type TYPE        Filter by type
+  arete context list --limit N          Limit results
+  arete context clear                   Clear all context
+  arete context import <file>           Import from Chrome extension
+
 Examples:
   arete identity set "I'm a PM at fintech, prefer concise responses"
   arete identity transform --model claude
+  arete context list --type page_visit --limit 5
+  arete context import ~/Downloads/arete-export.json
 `);
 }
 
@@ -175,6 +242,37 @@ if (command === "identity" || command === "id") {
       break;
     default:
       cmdHelp();
+  }
+} else if (command === "context" || command === "ctx") {
+  switch (subcommand) {
+    case "list": {
+      const options: ListContextOptions = {};
+      const typeIdx = args.indexOf("--type");
+      if (typeIdx !== -1 && args[typeIdx + 1]) {
+        options.type = args[typeIdx + 1];
+      }
+      const sourceIdx = args.indexOf("--source");
+      if (sourceIdx !== -1 && args[sourceIdx + 1]) {
+        options.source = args[sourceIdx + 1];
+      }
+      const limitIdx = args.indexOf("--limit");
+      if (limitIdx !== -1 && args[limitIdx + 1]) {
+        options.limit = parseInt(args[limitIdx + 1], 10);
+      }
+      cmdContextList(options);
+      break;
+    }
+    case "clear":
+      cmdContextClear();
+      break;
+    case "import":
+      cmdContextImport(args[2]).catch((e) => {
+        console.error("Import failed:", e.message);
+        process.exit(1);
+      });
+      break;
+    default:
+      cmdContextHelp();
   }
 } else {
   cmdHelp();

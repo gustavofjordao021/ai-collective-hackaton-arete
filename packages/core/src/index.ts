@@ -5,7 +5,7 @@
  * Platform-agnostic - can be used in browser, Node, or Raycast.
  */
 
-// Schema
+// Schema - Identity
 export {
   AreteIdentitySchema,
   ProjectSchema,
@@ -16,6 +16,33 @@ export {
   type AreteIdentity,
   type Project,
   type Source,
+} from "./schema/index.js";
+
+// Schema - Context
+export {
+  ContextEventSchema,
+  ContextStoreSchema,
+  PageVisitDataSchema,
+  SelectionDataSchema,
+  ConversationDataSchema,
+  InsightDataSchema,
+  FileDataSchema,
+  ContextEventType,
+  PageType,
+  createContextEvent,
+  createEmptyContextStore,
+  parseContextStore,
+  safeParseContextStore,
+  parseContextEvent,
+  safeParseContextEvent,
+  type ContextEvent,
+  type ContextStore,
+  type PageVisitData,
+  type SelectionData,
+  type ConversationData,
+  type InsightData,
+  type FileData,
+  type ContextEventTypeValue,
 } from "./schema/index.js";
 
 // Extraction
