@@ -70,3 +70,18 @@ export {
   type TransformOptions,
   type TransformResult,
 } from "./transforms/index.js";
+
+// Supabase integration
+export {
+  createAreteClient,
+  getSupabaseConfig,
+  type AreteClient,
+  type AreteClientOptions,
+  type StorageAdapter,
+  type ContextEvent as SupabaseContextEvent,
+  type ContextEventInput,
+  type ContextQueryOptions,
+} from "./supabase/index.js";
+
+// Type alias for backwards compatibility
+export type { AreteIdentity as Identity } from "./schema/index.js";
