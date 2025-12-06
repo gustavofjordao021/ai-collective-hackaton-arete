@@ -3,7 +3,11 @@
   "name": "Arete",
   "version": "0.1.0",
   "description": "Portable AI identity",
-  "permissions": ["storage", "activeTab"],
+  "permissions": ["storage", "activeTab", "identity"],
+  "oauth2": {
+    "client_id": "YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com",
+    "scopes": ["openid", "email", "profile"]
+  },
   "background": {
     "service_worker": "background.js",
     "type": "module"

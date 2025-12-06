@@ -11,6 +11,9 @@ export {
   type Source,
 } from "./identity.js";
 
+// Type alias for convenience
+export type { AreteIdentity as Identity } from "./identity.js";
+
 // Context schema
 export {
   ContextEventSchema,

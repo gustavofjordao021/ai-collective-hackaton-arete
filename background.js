@@ -4,6 +4,18 @@
  */
 
 import { CLAUDE_API_KEY } from './src/keys.js';
+import { signInWithGoogle, signOut, getAuthState, initAuth } from './src/supabase';
+
+// Initialize Supabase auth with env vars (injected at build time)
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+
+if (SUPABASE_URL && SUPABASE_ANON_KEY) {
+  initAuth({ supabaseUrl: SUPABASE_URL, supabaseAnonKey: SUPABASE_ANON_KEY });
+  console.log('Arete: Supabase auth initialized');
+} else {
+  console.warn('Arete: Supabase credentials not configured');
+}
 
 // Optimized extraction prompt (v2 with XML tags)
 const EXTRACTION_SYSTEM_PROMPT = `You are an identity extraction system. Extract structured information from user-provided text.
@@ -113,5 +125,29 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       .then(identity => sendResponse({ success: true, identity }))
       .catch(error => sendResponse({ success: false, error: error.message }));
     return true; // Keep message channel open for async response
+  }
+
+  if (request.type === 'GET_AUTH_STATE') {
+    getAuthState()
+      .then(state => sendResponse(state))
+      .catch(error => {
+        console.error('Auth state error:', error);
+        sendResponse({ isAuthenticated: false, user: null, loading: false });
+      });
+    return true;
+  }
+
+  if (request.type === 'SIGN_IN_WITH_GOOGLE') {
+    signInWithGoogle()
+      .then(user => sendResponse({ success: true, user }))
+      .catch(error => sendResponse({ success: false, error: error.message }));
+    return true;
+  }
+
+  if (request.type === 'SIGN_OUT') {
+    signOut()
+      .then(() => sendResponse({ success: true }))
+      .catch(error => sendResponse({ success: false, error: error.message }));
+    return true;
   }
 });

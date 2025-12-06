@@ -11,6 +11,104 @@ const LIMITS = {
 const TAB_ACTIVE_CLASSES = ['bg-white', 'shadow-sm', 'text-arete-text'];
 const TAB_INACTIVE_CLASSES = ['text-arete-text-tertiary', 'hover:text-arete-text-secondary'];
 
+// Auth state
+let currentUser = null;
+
+/**
+ * Get current auth state from background script
+ */
+async function getAuthState() {
+  return new Promise((resolve) => {
+    chrome.runtime.sendMessage({ type: 'GET_AUTH_STATE' }, (response) => {
+      if (chrome.runtime.lastError) {
+        console.error('Auth state error:', chrome.runtime.lastError);
+        resolve({ isAuthenticated: false, user: null });
+      } else {
+        resolve(response || { isAuthenticated: false, user: null });
+      }
+    });
+  });
+}
+
+/**
+ * Sign in with Google via background script
+ */
+async function signIn() {
+  const btn = document.getElementById('auth-btn');
+  btn.disabled = true;
+  btn.textContent = 'Signing in...';
+
+  try {
+    const response = await new Promise((resolve, reject) => {
+      chrome.runtime.sendMessage({ type: 'SIGN_IN_WITH_GOOGLE' }, (res) => {
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+        } else if (!res?.success) {
+          reject(new Error(res?.error || 'Sign in failed'));
+        } else {
+          resolve(res);
+        }
+      });
+    });
+
+    currentUser = response.user;
+    updateAuthUI();
+  } catch (err) {
+    console.error('Sign in error:', err);
+    alert('Sign in failed: ' + err.message);
+    btn.disabled = false;
+    btn.textContent = 'Sign in';
+  }
+}
+
+/**
+ * Sign out via background script
+ */
+async function signOutUser() {
+  try {
+    await new Promise((resolve, reject) => {
+      chrome.runtime.sendMessage({ type: 'SIGN_OUT' }, (res) => {
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+        } else if (!res?.success) {
+          reject(new Error(res?.error || 'Sign out failed'));
+        } else {
+          resolve(res);
+        }
+      });
+    });
+
+    currentUser = null;
+    updateAuthUI();
+  } catch (err) {
+    console.error('Sign out error:', err);
+    alert('Sign out failed: ' + err.message);
+  }
+}
+
+/**
+ * Update auth button UI based on current state
+ */
+function updateAuthUI() {
+  const btn = document.getElementById('auth-btn');
+
+  if (currentUser) {
+    const email = currentUser.email || 'User';
+    const initial = email.charAt(0).toUpperCase();
+    btn.innerHTML = `
+      <div class="w-6 h-6 bg-arete-accent rounded-full flex items-center justify-center text-white text-xs font-medium">${initial}</div>
+      <span class="max-w-[100px] truncate">${email}</span>
+    `;
+    btn.onclick = signOutUser;
+    btn.title = 'Click to sign out';
+  } else {
+    btn.innerHTML = 'Sign in';
+    btn.onclick = signIn;
+    btn.title = 'Sign in with Google';
+    btn.disabled = false;
+  }
+}
+
 /**
  * Extract identity from prose using LLM via background script
  * Uses Claude Haiku for accurate natural language understanding
@@ -289,6 +387,12 @@ async function saveIdentity() {
 
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
+  // Load auth state first
+  const authState = await getAuthState();
+  currentUser = authState.user;
+  updateAuthUI();
+
+  // Load stats and setup UI
   await loadStats();
   setupTabs();
   document.getElementById('save-identity-btn').addEventListener('click', saveIdentity);
