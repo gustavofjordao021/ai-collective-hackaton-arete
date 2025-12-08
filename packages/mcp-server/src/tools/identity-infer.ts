@@ -181,6 +181,123 @@ const TYPE_KEYWORDS: Record<DomainType, string[]> = {
   general: [],
 };
 
+// --- Haiku Integration ---
+
+const HAIKU_MODEL = "claude-3-haiku-20240307";
+const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
+
+// Cache for Haiku categorization results (persists during session)
+const haikusCache = new Map<string, DomainInfo>();
+
+/**
+ * Get Anthropic API key from environment
+ */
+function getAnthropicApiKey(): string | null {
+  return process.env.ANTHROPIC_API_KEY || null;
+}
+
+/**
+ * Build prompt for Haiku domain categorization
+ */
+function buildCategorizationPrompt(domain: string, urls: string[], titles: string[]): string {
+  return `<task>
+Categorize this website domain based on the URLs and page titles provided.
+</task>
+
+<domain>${domain}</domain>
+
+<urls>
+${urls.slice(0, 5).join("\n")}
+</urls>
+
+<titles>
+${titles.slice(0, 5).join("\n")}
+</titles>
+
+<categories>
+- tech: Developer tools, programming languages, frameworks, APIs, cloud services
+- health: Healthcare, wellness, medical information, fitness
+- sports: Sports news, teams, leagues, athletic content
+- news: News sites, journalism, current events
+- shopping: E-commerce, retail, online stores
+- finance: Banking, investing, financial news
+- entertainment: Movies, music, streaming, gaming
+- general: Anything else
+</categories>
+
+<output_format>
+Return ONLY a JSON object with these fields:
+- type: one of the categories above
+- name: A readable name for this site (e.g., "React", "ESPN", "Amazon")
+- label: A brief description for what the user is interested in (e.g., "React development", "sports", "online shopping")
+- category: "expertise" if tech-related, "interest" otherwise
+</output_format>
+
+<example>
+For domain "supabase.com" with titles ["Supabase Docs", "Database Guide"]:
+{"type":"tech","name":"Supabase","label":"Supabase development","category":"expertise"}
+</example>
+
+Return ONLY the JSON, no other text.`;
+}
+
+/**
+ * Call Haiku to categorize a domain
+ */
+async function categorizeDomainWithHaiku(
+  domain: string,
+  urls: string[],
+  titles: string[],
+  apiKey: string
+): Promise<DomainInfo | null> {
+  try {
+    const prompt = buildCategorizationPrompt(domain, urls, titles);
+
+    const response = await fetch(ANTHROPIC_API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: HAIKU_MODEL,
+        max_tokens: 256,
+        messages: [{ role: "user", content: prompt }],
+      }),
+    });
+
+    if (!response.ok) {
+      console.error(`Haiku API error: ${response.status}`);
+      return null;
+    }
+
+    const data = await response.json() as {
+      content: Array<{ type: string; text: string }>;
+    };
+
+    const text = data.content?.[0]?.text;
+    if (!text) return null;
+
+    // Parse JSON response
+    const parsed = JSON.parse(text) as {
+      type: DomainType;
+      name: string;
+      label?: string;
+      category?: string;
+    };
+
+    return {
+      type: parsed.type || "general",
+      name: parsed.name || domain,
+      label: parsed.label,
+    };
+  } catch (error) {
+    console.error("Haiku categorization failed:", error);
+    return null;
+  }
+}
+
 // --- Helpers ---
 
 function daysSince(timestamp: string): number {
@@ -220,7 +337,7 @@ function inferDomainType(domain: string, urls: string[], titles: string[]): Doma
 }
 
 /**
- * Get domain info including type and readable name
+ * Get domain info including type and readable name (synchronous, static only)
  */
 function getDomainInfo(domain: string, urls: string[] = [], titles: string[] = []): DomainInfo {
   // Check for known mappings (exact match)
@@ -250,6 +367,60 @@ function getDomainInfo(domain: string, urls: string[] = [], titles: string[] = [
     .replace(/\.(com|org|io|dev|net|co|land|br)$/, "")
     .split(/[-.]/)
     .filter(s => s.length > 1) // Filter out single chars
+    .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
+    .join(" ");
+
+  return { type: inferredType, name };
+}
+
+/**
+ * Get domain info with Haiku intelligence for unknown domains
+ */
+async function getDomainInfoWithHaiku(
+  domain: string,
+  urls: string[] = [],
+  titles: string[] = []
+): Promise<DomainInfo> {
+  // Check cache first
+  if (haikusCache.has(domain)) {
+    return haikusCache.get(domain)!;
+  }
+
+  // Check static mappings (exact match)
+  if (DOMAIN_INFO[domain]) {
+    return DOMAIN_INFO[domain];
+  }
+
+  // Check for subdomain matches
+  const parts = domain.split(".");
+  if (parts.length > 2) {
+    const baseDomain = parts.slice(-2).join(".");
+    if (DOMAIN_INFO[baseDomain]) {
+      return DOMAIN_INFO[baseDomain];
+    }
+    const fullWithSub = parts.slice(-3).join(".");
+    if (DOMAIN_INFO[fullWithSub]) {
+      return DOMAIN_INFO[fullWithSub];
+    }
+  }
+
+  // Try Haiku for unknown domains
+  const apiKey = getAnthropicApiKey();
+  if (apiKey) {
+    const haikuResult = await categorizeDomainWithHaiku(domain, urls, titles, apiKey);
+    if (haikuResult) {
+      // Cache the result
+      haikusCache.set(domain, haikuResult);
+      return haikuResult;
+    }
+  }
+
+  // Fall back to static inference
+  const inferredType = inferDomainType(domain, urls, titles);
+  const name = domain
+    .replace(/\.(com|org|io|dev|net|co|land|br)$/, "")
+    .split(/[-.]/)
+    .filter(s => s.length > 1)
     .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
     .join(" ");
 
@@ -370,10 +541,13 @@ function loadBlockedFacts(): BlockedFact[] {
 // --- Pattern Analysis ---
 
 /**
- * Analyze context events for patterns that suggest expertise or interests
+ * Collect domain statistics from events (shared helper)
  */
-export function analyzeContextForPatterns(events: ContextEvent[]): CandidateFact[] {
-  // Count visits by domain and collect URLs/titles
+function collectDomainStats(events: ContextEvent[]): {
+  domainCounts: Map<string, number>;
+  domainUrls: Map<string, string[]>;
+  domainTitles: Map<string, string[]>;
+} {
   const domainCounts = new Map<string, number>();
   const domainUrls = new Map<string, string[]>();
   const domainTitles = new Map<string, string[]>();
@@ -410,6 +584,16 @@ export function analyzeContextForPatterns(events: ContextEvent[]): CandidateFact
     }
   }
 
+  return { domainCounts, domainUrls, domainTitles };
+}
+
+/**
+ * Analyze context events for patterns that suggest expertise or interests
+ * (Synchronous version - uses static categorization only)
+ */
+export function analyzeContextForPatterns(events: ContextEvent[]): CandidateFact[] {
+  const { domainCounts, domainUrls, domainTitles } = collectDomainStats(events);
+
   // Convert to candidates (require at least 3 visits for a pattern)
   const candidates: CandidateFact[] = [];
 
@@ -419,7 +603,7 @@ export function analyzeContextForPatterns(events: ContextEvent[]): CandidateFact
     const urls = domainUrls.get(domain) ?? [];
     const titles = domainTitles.get(domain) ?? [];
 
-    // Get domain info with type detection
+    // Get domain info with type detection (static only)
     const info = getDomainInfo(domain, urls, titles);
 
     // Generate appropriate content and category
@@ -440,6 +624,62 @@ export function analyzeContextForPatterns(events: ContextEvent[]): CandidateFact
       sourceRef: domain,
       visitCount: count,
     });
+  }
+
+  // Sort by confidence (visit count) descending
+  candidates.sort((a, b) => b.confidence - a.confidence);
+
+  return candidates;
+}
+
+/**
+ * Analyze context events for patterns with Haiku intelligence
+ * (Async version - uses Haiku for unknown domains when API key is set)
+ */
+export async function analyzeContextForPatternsWithHaiku(events: ContextEvent[]): Promise<CandidateFact[]> {
+  const { domainCounts, domainUrls, domainTitles } = collectDomainStats(events);
+
+  // Convert to candidates (require at least 3 visits for a pattern)
+  const candidates: CandidateFact[] = [];
+
+  // Get domains that need categorization
+  const domainsToProcess = Array.from(domainCounts.entries())
+    .filter(([_, count]) => count >= 3);
+
+  // Process domains in parallel (limit to avoid rate limiting)
+  const BATCH_SIZE = 3;
+  for (let i = 0; i < domainsToProcess.length; i += BATCH_SIZE) {
+    const batch = domainsToProcess.slice(i, i + BATCH_SIZE);
+
+    const results = await Promise.all(
+      batch.map(async ([domain, count]) => {
+        const urls = domainUrls.get(domain) ?? [];
+        const titles = domainTitles.get(domain) ?? [];
+
+        // Get domain info with Haiku (async)
+        const info = await getDomainInfoWithHaiku(domain, urls, titles);
+
+        // Generate appropriate content and category
+        const content = generateFactContent(info);
+        const category = getFactCategory(info.type);
+
+        // Calculate confidence based on visit count
+        const confidence = Math.min(0.8, 0.4 + count * 0.05);
+
+        return {
+          id: crypto.randomUUID(),
+          category,
+          content,
+          confidence,
+          maturity: "candidate" as const,
+          source: "inferred" as const,
+          sourceRef: domain,
+          visitCount: count,
+        };
+      })
+    );
+
+    candidates.push(...results);
   }
 
   // Sort by confidence (visit count) descending
@@ -493,8 +733,8 @@ export async function inferHandler(input: InferInput): Promise<InferToolResult> 
     (e) => daysSince(e.timestamp) <= lookbackDays
   );
 
-  // Analyze for patterns
-  let candidates = analyzeContextForPatterns(recentEvents);
+  // Analyze for patterns (use Haiku when API key is set)
+  let candidates = await analyzeContextForPatternsWithHaiku(recentEvents);
 
   // Filter out existing and blocked facts
   candidates = candidates.filter((c) => {

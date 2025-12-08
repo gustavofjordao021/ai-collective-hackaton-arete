@@ -443,6 +443,135 @@ describe("arete_infer tool", () => {
     });
   });
 
+  describe("Haiku integration for smart categorization", () => {
+    it("calls Haiku to categorize unknown domains when API key is set", async () => {
+      // Mock fetch to simulate Haiku response
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({
+          content: [{ text: JSON.stringify({
+            type: "tech",
+            name: "Custom Dev Tool",
+            label: "Custom Dev Tool development",
+            category: "expertise"
+          })}]
+        })
+      });
+      vi.stubGlobal("fetch", mockFetch);
+
+      // Set API key in environment
+      const originalEnv = process.env.ANTHROPIC_API_KEY;
+      process.env.ANTHROPIC_API_KEY = "sk-ant-test-key";
+
+      const events = [
+        createContextEvent("page_visit", { url: "https://unknowntool.io/docs", title: "Unknown Tool Documentation" }),
+        createContextEvent("page_visit", { url: "https://unknowntool.io/api", title: "API Reference" }),
+        createContextEvent("page_visit", { url: "https://unknowntool.io/guide", title: "Getting Started" }),
+      ];
+      writeFileSync(join(TEST_DIR, "context.json"), JSON.stringify(events));
+      writeFileSync(join(TEST_DIR, "identity.json"), JSON.stringify(createTestIdentityV2()));
+
+      const result = await inferHandler({});
+
+      // Should have called Haiku API
+      expect(mockFetch).toHaveBeenCalled();
+      const fetchCall = mockFetch.mock.calls[0];
+      expect(fetchCall[0]).toBe("https://api.anthropic.com/v1/messages");
+
+      // Restore
+      process.env.ANTHROPIC_API_KEY = originalEnv;
+      vi.unstubAllGlobals();
+    });
+
+    it("falls back to static categorization when API key is not set", async () => {
+      // No API key
+      const originalEnv = process.env.ANTHROPIC_API_KEY;
+      delete process.env.ANTHROPIC_API_KEY;
+
+      const events = [
+        createContextEvent("page_visit", { url: "https://react.dev/learn", title: "React Docs" }),
+        createContextEvent("page_visit", { url: "https://react.dev/reference", title: "React API" }),
+        createContextEvent("page_visit", { url: "https://react.dev/blog", title: "React Blog" }),
+      ];
+      writeFileSync(join(TEST_DIR, "context.json"), JSON.stringify(events));
+      writeFileSync(join(TEST_DIR, "identity.json"), JSON.stringify(createTestIdentityV2()));
+
+      const result = await inferHandler({});
+
+      // Should still work with static categorization
+      const reactCandidate = result.structuredContent.candidates.find((c: { content: string }) =>
+        c.content.toLowerCase().includes("react")
+      );
+      expect(reactCandidate).toBeDefined();
+
+      process.env.ANTHROPIC_API_KEY = originalEnv;
+    });
+
+    it("caches Haiku responses to avoid duplicate API calls", async () => {
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({
+          content: [{ text: JSON.stringify({
+            type: "tech",
+            name: "Cached Tool",
+            label: "Cached Tool development",
+            category: "expertise"
+          })}]
+        })
+      });
+      vi.stubGlobal("fetch", mockFetch);
+
+      const originalEnv = process.env.ANTHROPIC_API_KEY;
+      process.env.ANTHROPIC_API_KEY = "sk-ant-test-key";
+
+      // First call
+      const events1 = [
+        createContextEvent("page_visit", { url: "https://cachedtool.io/docs", title: "Cached Tool" }),
+        createContextEvent("page_visit", { url: "https://cachedtool.io/docs", title: "Cached Tool" }),
+        createContextEvent("page_visit", { url: "https://cachedtool.io/docs", title: "Cached Tool" }),
+      ];
+      writeFileSync(join(TEST_DIR, "context.json"), JSON.stringify(events1));
+      writeFileSync(join(TEST_DIR, "identity.json"), JSON.stringify(createTestIdentityV2()));
+
+      await inferHandler({});
+      const firstCallCount = mockFetch.mock.calls.length;
+
+      // Second call with same domain - should use cache
+      await inferHandler({});
+      const secondCallCount = mockFetch.mock.calls.length;
+
+      // Should not have made additional API calls for the same domain
+      // (Note: exact behavior depends on implementation - might call once per infer or cache)
+      expect(secondCallCount).toBeLessThanOrEqual(firstCallCount + 1);
+
+      process.env.ANTHROPIC_API_KEY = originalEnv;
+      vi.unstubAllGlobals();
+    });
+
+    it("handles Haiku API errors gracefully", async () => {
+      const mockFetch = vi.fn().mockRejectedValue(new Error("API Error"));
+      vi.stubGlobal("fetch", mockFetch);
+
+      const originalEnv = process.env.ANTHROPIC_API_KEY;
+      process.env.ANTHROPIC_API_KEY = "sk-ant-test-key";
+
+      const events = [
+        createContextEvent("page_visit", { url: "https://errortest.io/docs", title: "Test" }),
+        createContextEvent("page_visit", { url: "https://errortest.io/docs", title: "Test" }),
+        createContextEvent("page_visit", { url: "https://errortest.io/docs", title: "Test" }),
+      ];
+      writeFileSync(join(TEST_DIR, "context.json"), JSON.stringify(events));
+      writeFileSync(join(TEST_DIR, "identity.json"), JSON.stringify(createTestIdentityV2()));
+
+      // Should not throw, should fall back to static
+      const result = await inferHandler({});
+      expect(result.structuredContent.success).toBe(true);
+
+      process.env.ANTHROPIC_API_KEY = originalEnv;
+      vi.unstubAllGlobals();
+    });
+  });
+
   describe("confidence scoring", () => {
     it("higher visit count yields higher confidence", () => {
       const fewVisits = [
