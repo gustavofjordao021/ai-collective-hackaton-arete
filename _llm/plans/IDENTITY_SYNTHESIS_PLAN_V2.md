@@ -1,9 +1,10 @@
 # Identity Synthesis Plan (v2)
 
 > Created: 2025-12-08
-> Status: Planning
+> Status: ✅ Complete (Phases 1-5)
 > Depends on: [ARETE_V2_ARCHITECTURE.md](./ARETE_V2_ARCHITECTURE.md), [CONTEXT_ROLLUP_PLAN_V2.md](./CONTEXT_ROLLUP_PLAN_V2.md)
 > Replaces: [IDENTITY_SYNTHESIS_PLAN_V1.md](../archive/IDENTITY_SYNTHESIS_PLAN_V1.md)
+> Completed: 2025-12-08
 
 ## Goal
 
@@ -444,49 +445,52 @@ blocked_inferences       -- Facts user rejected
 
 ## Implementation Phases
 
-### Phase 1: Schema + Migration (2-3 hours)
-- [ ] Define `IdentityFact` interface in schema
-- [ ] Define `IdentityV2` interface
-- [ ] Write `migrateV1ToV2()` function
-- [ ] Update file read/write to handle both versions
-- [ ] Tests for migration (v1 → v2 preserves all data)
+### Phase 1: Schema + Migration ✅
+- [x] Define `IdentityFact` interface in schema
+- [x] Define `IdentityV2` interface
+- [x] Write `migrateV1ToV2()` function
+- [x] Update file read/write to handle both versions
+- [x] Tests for migration (v1 → v2 preserves all data)
 
-### Phase 2: Confidence Decay (1-2 hours)
-- [ ] Implement `getEffectiveConfidence()` function
-- [ ] Implement `daysSince()` helper
-- [ ] Add decay calculation to fact retrieval
-- [ ] CLI command: `arete identity list --show-confidence`
-- [ ] Tests for decay math
+### Phase 2: Confidence Decay ✅
+- [x] Implement `getEffectiveConfidence()` function
+- [x] Implement `daysSince()` helper
+- [x] Add decay calculation to fact retrieval
+- [x] Tests for decay math
+- [ ] CLI command: `arete identity list --show-confidence` (deferred)
 
-### Phase 3: Maturity Tracking (1-2 hours)
-- [ ] Implement `validateFact()` transitions
-- [ ] Implement `demoteFact()` for low confidence
-- [ ] Update `arete_update_identity` to create facts with maturity
-- [ ] Add `arete_validate_fact` tool
-- [ ] Tests for maturity state machine
+### Phase 3: Maturity Tracking ✅
+- [x] Implement `validateFact()` transitions
+- [x] Update `arete_update_identity` to create facts with maturity
+- [x] Add `arete_validate_fact` tool
+- [x] Tests for maturity state machine
+- [ ] Implement `demoteFact()` for low confidence (deferred - auto-cleanup)
 
-### Phase 4: Projection Engine (2-3 hours)
-- [ ] Implement `projectIdentity()` function
-- [ ] Implement `scoreRelevance()` (keyword matching)
-- [ ] Add `arete_context` tool
-- [ ] Test with various task queries
-- [ ] Compare projection vs full dump
+### Phase 4: Projection Engine ✅
+- [x] Implement `projectIdentity()` function
+- [x] Implement `scoreRelevance()` (keyword matching)
+- [x] Add `arete_context` tool
+- [x] Test with various task queries
+- [x] Compare projection vs full dump
 
-### Phase 5: Inference Integration (2-3 hours)
-- [ ] Implement `arete_infer` tool
-- [ ] Connect to `candidate_facts` table (cloud)
-- [ ] Implement local context analysis (offline)
-- [ ] Add `arete_reject_fact` tool
-- [ ] Create `blocked.json` storage
-- [ ] Tests for inference pipeline
+### Phase 5: Inference Integration ✅
+- [x] Implement `arete_infer` tool
+- [x] Implement local context analysis (offline)
+- [x] Add `arete_reject_fact` tool
+- [x] Create `blocked.json` storage
+- [x] Tests for inference pipeline
+- [x] **BONUS:** Haiku integration for smart domain categorization
+- [x] **BONUS:** Orchestration guidance (Agent Skills pattern)
+- [ ] Connect to `candidate_facts` table (cloud) — deferred to Context Rollup
 
-### Phase 6: Archive + Cleanup (1 hour)
+### Phase 6: Archive + Cleanup (deferred)
 - [ ] Implement fact archival (confidence < 0.1)
 - [ ] Create `~/.arete/archive/` structure
 - [ ] Periodic cleanup function
 - [ ] CLI command: `arete identity archive`
 
-**Total: ~10-14 hours**
+**Completed: Phases 1-5 (~12 hours)**
+**Deferred: Phase 6 (nice-to-have)**
 
 ---
 
@@ -664,3 +668,48 @@ Context Rollup handles **storage management** and **pattern extraction**.
 Identity Synthesis handles **knowledge lifecycle** and **AI projection**.
 
 They meet at `candidate_facts` - rollup creates them, synthesis validates them.
+
+---
+
+## Completion Summary (2025-12-08)
+
+### What Was Built
+
+**MCP Tools (8 total):**
+- `arete_get_identity` — Full identity with confidence scores
+- `arete_update_identity` — Create/update facts with maturity tracking
+- `arete_validate_fact` — Boost confidence, advance maturity
+- `arete_reject_fact` — Block facts from re-suggestion
+- `arete_context` — Task-aware projection (relevance × confidence)
+- `arete_infer` — Extract candidate facts from browsing patterns
+- `arete_get_recent_context` — Raw context events
+- `arete_add_context_event` — Record insights
+
+**Core Features:**
+- IdentityV2 schema with facts, confidence, maturity
+- Confidence decay (60-day half-life)
+- Maturity state machine (candidate → established → proven)
+- Task-aware projection engine with keyword relevance
+- Local inference from browsing patterns
+- Haiku integration for smart domain categorization (unknown sites)
+- Orchestration guidance (Agent Skills pattern) for Claude Desktop
+
+**Test Coverage:** 116 tests passing
+
+### Demo Results
+
+Claude Desktop successfully:
+1. Calls `arete_get_identity` FIRST (follows orchestration hints)
+2. Combines identity + infer + raw context
+3. Produces personalized responses:
+   - Connects sports sites to known team preferences (Vasco)
+   - Uses PM role for product-speak tone
+   - References employer context naturally (PayNearMe)
+
+### Key Commits
+```
+373be8d feat: add orchestration guidance to MCP tool descriptions
+e7bcda9 feat: add Haiku integration for smart domain categorization
+df6c145 feat: identity v2 with fact-based architecture
+4d31437 feat: identity synthesis with MCP update tool
+```
