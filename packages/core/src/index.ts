@@ -120,5 +120,17 @@ export {
   type CLIConfig,
 } from "./supabase/index.js";
 
+// Archive (Phase 6: cleanup expired facts)
+export {
+  findExpiredFacts,
+  archiveFacts,
+  runArchiveCleanup,
+  getArchiveDir,
+  getConfigDir,
+  setConfigDir,
+  DEFAULT_ARCHIVE_THRESHOLD,
+  type CleanupResult,
+} from "./archive/index.js";
+
 // Type alias for backwards compatibility
 export type { AreteIdentity as Identity } from "./schema/index.js";

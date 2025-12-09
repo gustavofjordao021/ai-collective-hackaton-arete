@@ -11,6 +11,7 @@
  *   arete identity set "prose..."         Extract and store identity from prose
  *   arete identity transform --model X    Output system prompt for model
  *   arete identity clear                  Clear stored identity
+ *   arete identity archive                Archive expired facts
  *
  *   arete context list                    Show recent context events
  *   arete context list --type page_visit  Filter by type
@@ -47,6 +48,11 @@ import {
   createCLIClient,
   type CLIClient,
 } from "../supabase/cli-client.js";
+import {
+  runArchiveCleanup,
+  setConfigDir,
+  getArchiveDir,
+} from "../archive/index.js";
 
 // Storage location
 const CONFIG_DIR = join(homedir(), ".arete");
@@ -354,6 +360,7 @@ Identity:
   arete identity transform --model X    Output system prompt (claude|openai)
   arete identity clear                  Clear stored identity
   arete identity json                   Output raw JSON
+  arete identity archive                Archive expired facts (confidence < 0.1)
 
 Context:
   arete context list                    Show recent context events
@@ -373,6 +380,30 @@ Examples:
 function cmdJson(): void {
   const identity = loadIdentity();
   console.log(JSON.stringify(identity, null, 2));
+}
+
+/**
+ * Archive expired facts (effective confidence < 0.1)
+ */
+async function cmdArchive(threshold?: number): Promise<void> {
+  // Ensure archive module uses the same config dir
+  setConfigDir(CONFIG_DIR);
+
+  console.log("Scanning for expired facts...");
+  const result = await runArchiveCleanup(threshold);
+
+  if (result.archivedCount === 0) {
+    console.log("No expired facts found.");
+    console.log(`Total facts: ${result.remainingCount}`);
+    return;
+  }
+
+  console.log(`\nArchived ${result.archivedCount} expired fact(s).`);
+  console.log(`Remaining facts: ${result.remainingCount}`);
+  if (result.archivePath) {
+    console.log(`Archive file: ${result.archivePath}`);
+  }
+  console.log(`\nArchive directory: ${getArchiveDir()}`);
 }
 
 // Parse arguments
@@ -436,6 +467,15 @@ if (command === "auth") {
     case "json":
       cmdJson();
       break;
+    case "archive": {
+      const thresholdIdx = args.indexOf("--threshold");
+      const threshold = thresholdIdx !== -1 ? parseFloat(args[thresholdIdx + 1]) : undefined;
+      cmdArchive(threshold).catch((e) => {
+        console.error("Error:", e.message);
+        process.exit(1);
+      });
+      break;
+    }
     default:
       cmdHelp();
   }
