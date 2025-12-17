@@ -57,6 +57,31 @@ Arete stores your identity locally (`~/.arete/`) and syncs to the cloud. The MCP
 - Your preferences (communication style, tools you use)
 - Your expertise (skills, domains)
 
+## Recommended: System Prompt
+
+For Claude to **automatically** capture context (not just respond to manual tool calls), add this to your Claude Desktop system prompt:
+
+**Settings → Claude's memory & system prompt → paste this:**
+
+```
+You have Arete tools for portable identity.
+
+AT CONVERSATION START: Call arete_get_identity to know who you're talking to.
+
+AFTER RESPONSES: If the user revealed a preference, constraint, or personal fact — store it:
+- Use arete_add_context_event for insights (type="insight", data={insight: "..."})
+- Use arete_update_identity for structured facts (section, operation, value, reasoning)
+
+Examples:
+- "I'm Brazilian" → store nationality
+- "I prefer short answers" → store communication preference
+- "I'm learning Rust" → store current focus
+
+This is not optional. Storing context is part of completing the task.
+```
+
+Without this, you get tools but Claude won't proactively use them.
+
 ## Get an Invite Code
 
 Request an invite code at: https://github.com/gustavofjordao021/ai-collective-hackaton-arete/issues
