@@ -1,2 +1,126 @@
-# arete-ai
-Portable AI identity that works across models and tools
+# Arete
+
+> **Your AI, at its best, everywhere.**
+
+Portable AI identity that follows you across models and tools. Your context, preferences, and expertise — remembered and applied consistently, whether you're using Claude, GPT, or any other AI.
+
+## The Problem
+
+Every AI conversation starts from zero. You repeat yourself constantly:
+- "I'm a PM at a fintech startup..."
+- "I prefer concise answers..."
+- "We use TypeScript and PostgreSQL..."
+
+Your context is trapped in each tool's silo. Switch from ChatGPT to Claude? Start over.
+
+## The Solution
+
+Arete creates a portable identity layer that works across AI tools:
+
+- **One identity, everywhere** — Define yourself once, use it anywhere
+- **Automatic context capture** — AI learns your preferences as you chat
+- **Cross-model portability** — Same "you" whether using Claude, GPT, or others
+- **Privacy-first** — Your data stays local (with optional cloud sync)
+
+## Quick Start
+
+### For Claude Desktop Users
+
+```bash
+# 1. Sign up (get invite code from maintainers)
+npx arete-mcp-server setup
+
+# 2. Add to Claude Desktop config (~/.config/claude/claude_desktop_config.json):
+{
+  "mcpServers": {
+    "arete": {
+      "command": "npx",
+      "args": ["arete-mcp-server"]
+    }
+  }
+}
+
+# 3. Restart Claude Desktop
+
+# 4. Ask Claude: "What do you know about me?"
+```
+
+That's it. No repo cloning needed.
+
+### For Developers
+
+```bash
+git clone https://github.com/gustavofjordao021/arete-ai.git
+cd arete-ai
+npm install
+npm run build
+```
+
+## How It Works
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                     Your Identity                        │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐     │
+│  │  Expertise  │  │ Preferences │  │   Context   │     │
+│  │  TypeScript │  │   Concise   │  │  PM @ fintech│     │
+│  │  React      │  │  No emojis  │  │  Learning Go │     │
+│  └─────────────┘  └─────────────┘  └─────────────┘     │
+└─────────────────────────────────────────────────────────┘
+                           │
+                           ▼
+        ┌──────────────────┼──────────────────┐
+        │                  │                  │
+        ▼                  ▼                  ▼
+   ┌─────────┐       ┌─────────┐       ┌─────────┐
+   │ Claude  │       │   GPT   │       │  Other  │
+   │ Desktop │       │  (soon) │       │   AIs   │
+   └─────────┘       └─────────┘       └─────────┘
+```
+
+Arete stores structured facts about you:
+- **Who you are** — Role, background, location
+- **What you know** — Skills, expertise levels, domains
+- **How you work** — Preferences, constraints, tools
+- **What you're doing** — Current projects, learning goals
+
+## Features
+
+| Feature | Status |
+|---------|--------|
+| MCP Server for Claude Desktop | ✅ Live |
+| Chrome Extension | ✅ Beta |
+| Automatic context capture | ✅ Live |
+| Local-first storage | ✅ Live |
+| Cloud sync | 🚧 Coming |
+| GPT/OpenAI integration | 🚧 Planned |
+| API for custom integrations | 🚧 Planned |
+
+## Packages
+
+| Package | Description | npm |
+|---------|-------------|-----|
+| `arete-mcp-server` | MCP server for Claude Desktop | [![npm](https://img.shields.io/npm/v/arete-mcp-server)](https://www.npmjs.com/package/arete-mcp-server) |
+
+## Project Structure
+
+```
+packages/
+├── core/           # Shared identity library
+├── mcp-server/     # Claude Desktop integration
+└── telemetry/      # Usage analytics (opt-in)
+
+src/                # Chrome extension
+```
+
+## Get an Invite Code
+
+We're in private beta. Request access by [opening an issue](https://github.com/gustavofjordao021/arete-ai/issues).
+
+## License
+
+MIT
+
+## Author
+
+**Gustavo Jordão** — [@gustavofjordao021](https://github.com/gustavofjordao021)
