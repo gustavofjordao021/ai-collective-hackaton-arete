@@ -11,6 +11,34 @@ Chrome extension that makes your AI identity portable. Invoke anywhere, any mode
 
 ---
 
+## Arete Integration (Claude Code)
+
+You have Arete tools for portable identity that works across AI tools (not just Claude).
+
+**AT CONVERSATION START:** Call `arete_get_identity` even if you have `userMemories`. Arete contains structured facts, expertise levels, and cross-platform context that your built-in memory doesn't capture. Use BOTH sources together.
+
+**AFTER RESPONSES:** Consider if the user revealed something DURABLE — useful in FUTURE conversations, not just this one.
+
+**REQUIRED WORKFLOW:**
+1. Call `arete_get_identity` at conversation start to know who you're talking to
+2. After EVERY response where the user reveals a preference, constraint, or personal fact — make a tool call to store it
+3. Use `arete_add_context_event` for insights (type="insight", data={insight: "..."})
+4. Use `arete_update_identity` for structured facts (section, operation, value, reasoning)
+
+This is not optional. Storing context is part of completing the task.
+
+**Examples of what to capture:**
+- "I'm Brazilian" → store nationality
+- "I like using the air fryer" → store cooking preference
+- "I prefer short answers" → store communication preference
+- "I'm learning Rust" → store current focus
+- "I don't like the iron taste" → store food dislike
+
+Do NOT skip this because "no tools are needed for the question."
+These are OUTPUT tools for recording, not INPUT tools for searching.
+
+---
+
 ## Quick Start
 
 ```bash
@@ -20,6 +48,48 @@ npm run build
 ```
 
 **Hotkey:** `Cmd+Shift+O` to open overlay, `ESC` to close
+
+---
+
+## For Testers (New Users)
+
+If you received an invite code from the Arete team:
+
+```bash
+# 1. Clone and build
+git clone <repo-url> && cd arete
+npm install
+npm run build
+
+# 2. Sign up with your invite code
+npm run cli -- auth signup ARETE-BETA-XXX your-email@example.com
+
+# Output:
+# ✓ Success! Account created for your-email@example.com
+# Your API key: sk_live_abc123...
+# [!] Save this key - it won't be shown again!
+
+# 3. Verify it worked
+npm run cli -- identity get
+npm run cli -- context list
+```
+
+**For Claude Desktop MCP integration:**
+
+1. Add to `~/.config/claude/claude_desktop_config.json`:
+```json
+{
+  "mcpServers": {
+    "arete": {
+      "command": "node",
+      "args": ["/full/path/to/arete/packages/mcp-server/dist/index.js"]
+    }
+  }
+}
+```
+
+2. Restart Claude Desktop
+3. Ask Claude: "What do you know about me?" — it should call `arete_get_identity`
 
 ---
 
@@ -84,7 +154,11 @@ For proactive context capture, add this block to your Claude Desktop system prom
 
 ```xml
 <arete>
-You have Arete tools for persistent memory across conversations.
+You have Arete tools for portable identity that works across AI tools (not just Claude).
+
+AT CONVERSATION START: Call `arete_get_identity` even if you have `userMemories`. Arete contains structured facts, expertise levels, and cross-platform context that your built-in memory doesn't capture. Use BOTH sources together.
+
+AFTER RESPONSES: Consider if the user revealed something DURABLE — useful in FUTURE conversations, not just this one.
 
 REQUIRED WORKFLOW:
 1. Call arete_get_identity at conversation start to know who you're talking to

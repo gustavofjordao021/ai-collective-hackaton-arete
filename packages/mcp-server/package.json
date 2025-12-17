@@ -1,31 +1,48 @@
 {
-  "name": "@arete/mcp-server",
+  "name": "arete-mcp-server",
   "version": "0.1.0",
-  "description": "MCP server for Arete identity and context",
+  "description": "MCP server for Arete portable AI identity - makes Claude Desktop remember who you are",
   "type": "module",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "main": "dist/bundle.js",
   "bin": {
-    "arete-mcp": "./dist/index.js"
+    "arete-mcp": "./dist/bundle.js"
   },
   "scripts": {
     "build": "tsc",
+    "bundle": "node build.mjs",
     "dev": "tsc --watch",
     "test": "vitest run",
     "test:watch": "vitest",
-    "start": "node dist/index.js"
+    "start": "node dist/bundle.js",
+    "prepublishOnly": "npm run bundle"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.6.1",
-    "@arete/core": "*",
     "zod": "^3.23.8"
   },
   "devDependencies": {
-    "typescript": "^5.7.2",
+    "@arete/core": "*",
+    "@arete/telemetry": "*",
     "@types/node": "^22.10.1",
+    "esbuild": "^0.27.2",
+    "typescript": "^5.7.2",
     "vitest": "^2.1.8"
   },
   "files": [
-    "dist"
-  ]
+    "dist/bundle.js",
+    "README.md"
+  ],
+  "keywords": [
+    "mcp",
+    "claude",
+    "anthropic",
+    "identity",
+    "ai",
+    "context",
+    "memory"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  }
 }

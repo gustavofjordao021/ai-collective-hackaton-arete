@@ -41,6 +41,7 @@ import {
   cmdAuthLogout,
   cmdAuthWhoami,
   cmdAuthStatus,
+  cmdAuthSignup,
   cmdAuthHelp,
 } from "./auth.js";
 import {
@@ -414,6 +415,12 @@ const subcommand = args[1];
 // Auth commands
 if (command === "auth") {
   switch (subcommand) {
+    case "signup":
+      cmdAuthSignup(args[2], args[3]).catch((e) => {
+        console.error("Signup failed:", e.message);
+        process.exit(1);
+      });
+      break;
     case "login":
       cmdAuthLogin(args[2]).catch((e) => {
         console.error("Login failed:", e.message);

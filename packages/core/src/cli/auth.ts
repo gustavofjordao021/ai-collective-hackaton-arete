@@ -227,18 +227,121 @@ export function cmdAuthStatus(): void {
 }
 
 /**
+ * Signup with invite code
+ */
+export async function cmdAuthSignup(inviteCode?: string, emailArg?: string): Promise<void> {
+  console.log("\nArete CLI Signup\n");
+
+  // Check if already logged in
+  const existingConfig = loadConfig();
+  if (existingConfig.apiKey && existingConfig.userId) {
+    console.log(`Already logged in as ${existingConfig.email || existingConfig.userId}`);
+    const overwrite = await prompt("Create new account anyway? (y/N): ");
+    if (overwrite.toLowerCase() !== "y") {
+      console.log("Cancelled.");
+      return;
+    }
+  }
+
+  // Get invite code
+  let code = inviteCode;
+  if (!code) {
+    console.log("To sign up, you need an invite code from the Arete team.");
+    console.log("");
+    code = await prompt("Invite code: ");
+  }
+
+  if (!code) {
+    console.error("\nError: Invite code is required.");
+    process.exit(1);
+  }
+
+  // Get email
+  let email = emailArg;
+  if (!email) {
+    email = await prompt("Email: ");
+  }
+
+  if (!email || !email.includes("@")) {
+    console.error("\nError: Valid email is required.");
+    process.exit(1);
+  }
+
+  // Get Supabase URL
+  const supabaseUrl = process.env.SUPABASE_URL || DEFAULT_SUPABASE_URL;
+
+  console.log("\nCreating account...");
+
+  try {
+    const response = await fetch(
+      `${supabaseUrl}/functions/v1/signup-with-invite`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ invite_code: code, email }),
+      }
+    );
+
+    const data = (await response.json()) as {
+      error?: string;
+      api_key?: string;
+      user_id?: string;
+      email?: string;
+    };
+
+    if (!response.ok) {
+      console.error(`\nError: ${data.error || "Signup failed"}`);
+      process.exit(1);
+    }
+
+    if (!data.api_key || !data.user_id) {
+      console.error("\nError: Invalid response from server");
+      process.exit(1);
+    }
+
+    // Save config with new credentials
+    const config: CLIConfig = {
+      supabaseUrl,
+      apiKey: data.api_key,
+      userId: data.user_id,
+      email: data.email,
+    };
+    saveConfig(config);
+
+    console.log(`\n✓ Success! Account created for ${data.email}`);
+    console.log(`\nYour API key: ${data.api_key}`);
+    console.log("\n[!] Save this key - it won't be shown again!");
+    console.log("\nConfig saved to ~/.arete/config.json");
+    console.log("\nYou can now use:");
+    console.log("  arete identity get    - View your identity");
+    console.log("  arete context list    - View your context events");
+    console.log("\nFor Claude Desktop MCP server, restart Claude Desktop.");
+  } catch (error) {
+    console.error("\nError:", (error as Error).message);
+    process.exit(1);
+  }
+}
+
+/**
  * Show auth help
  */
 export function cmdAuthHelp(): void {
   console.log(`
 Authentication Commands:
+  arete auth signup             Sign up with invite code
+  arete auth signup <code> <email>  Sign up (inline)
   arete auth login              Login with API key
   arete auth login <api-key>    Login with API key (inline)
   arete auth logout             Clear stored credentials
   arete auth whoami             Show current user and verify credentials
   arete auth status             Show stored credentials (without verification)
 
-Getting an API Key:
+Getting Started (New Users):
+  1. Get an invite code from the Arete team
+  2. Run: arete auth signup <invite-code> <your-email>
+  3. Save your API key (shown once!)
+
+Existing Users:
   1. Open the Arete extension popup in Chrome
   2. Sign in with Google
   3. Go to Settings > Create API Key
