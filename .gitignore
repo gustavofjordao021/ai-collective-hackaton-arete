@@ -3,3 +3,12 @@ dist
 src/keys.js
 popup.compiled.css
 .env
+
+# Internal docs (not for public)
+_llm/
+CLAUDE.md
+.claude/
+scripts/
+
+# OS files
+.DS_Store
