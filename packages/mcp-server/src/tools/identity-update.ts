@@ -181,7 +181,10 @@ function normalizeValueToString(value: unknown): string {
     return value.trim();
   }
 
-  // Fallback for other types
+  // Fallback for other types - JSON stringify objects to preserve structure
+  if (typeof value === "object" && value !== null) {
+    return JSON.stringify(value);
+  }
   return String(value);
 }
 
