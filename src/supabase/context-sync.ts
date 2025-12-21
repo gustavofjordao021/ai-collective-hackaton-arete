@@ -352,7 +352,9 @@ export async function loadFactsFromCloud(): Promise<Fact[]> {
     if (error) return [];
 
     return (data || []).map((event) => ({
-      fact: (event.data as { fact: string }).fact,
+      // Handle both formats: MCP writes data.insight, extension writes data.fact
+      fact: (event.data as { insight?: string; fact?: string }).insight ||
+            (event.data as { insight?: string; fact?: string }).fact || '',
       _timestamp: new Date(event.timestamp).getTime(),
     }));
   } catch {

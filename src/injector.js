@@ -1,6 +1,5 @@
 import { getIdentityForModel } from './identity/index.ts';
-import { getFactsForPrompt } from './memory/facts.js';
-import { getBrowsingContext } from './memory/pages.js';
+import { getMergedFactsForPrompt, getMergedBrowsingContext } from './memory/merged-context.ts';
 
 const AI_SITES = {
   'chat.openai.com': {
@@ -35,8 +34,8 @@ async function buildContext() {
   const model = site?.name === 'Claude' ? 'claude' : 'openai';
 
   const identityPrompt = await getIdentityForModel(model);
-  const facts = await getFactsForPrompt();
-  const browsing = await getBrowsingContext();
+  const facts = await getMergedFactsForPrompt();      // Now includes cloud insights
+  const browsing = await getMergedBrowsingContext();  // Now includes cloud pages
 
   return `[Context from Arete - my portable AI identity]
 ${identityPrompt}${facts}${browsing}
