@@ -38,15 +38,10 @@ npx arete-mcp-server --help             # Show help
 
 | Tool | Purpose |
 |------|---------|
-| `arete_get_identity` | Get your identity for personalization |
-| `arete_get_recent_context` | Get recent browsing/interaction context |
-| `arete_add_context_event` | Record insights from conversations |
-| `arete_update_identity` | Update identity facts |
-| `arete_validate_fact` | Strengthen fact confidence |
-| `arete_context` | Task-aware identity projection |
-| `arete_infer` | Extract facts from activity patterns |
-| `arete_reject_fact` | Block incorrect inferences |
-| `arete_accept_candidate` | Accept inferred facts |
+| `arete_identity` | Get your identity for personalization (supports task-aware projection) |
+| `arete_remember` | Store, validate, or remove facts (auto-detects category) |
+| `arete_activity` | Get recent browsing/interaction context |
+| `arete_infer` | Extract facts from activity patterns + accept/reject candidates |
 
 ## How It Works
 
@@ -66,16 +61,16 @@ For Claude to **automatically** capture context (not just respond to manual tool
 ```
 You have Arete tools for portable identity.
 
-AT CONVERSATION START: Call arete_get_identity to know who you're talking to.
+AT CONVERSATION START: Call arete_identity to know who you're talking to.
 
-AFTER RESPONSES: If the user revealed a preference, constraint, or personal fact — store it:
-- Use arete_add_context_event for insights (type="insight", data={insight: "..."})
-- Use arete_update_identity for structured facts (section, operation, value, reasoning)
+AFTER RESPONSES: If the user revealed a preference, constraint, or personal fact — store it with arete_remember:
 
 Examples:
-- "I'm Brazilian" → store nationality
-- "I prefer short answers" → store communication preference
-- "I'm learning Rust" → store current focus
+- "I'm Brazilian" → arete_remember(content: "User is Brazilian")
+- "I prefer short answers" → arete_remember(content: "Prefers concise responses")
+- "I'm learning Rust" → arete_remember(content: "Currently learning Rust")
+
+Category is auto-detected (core, expertise, preference, context, focus).
 
 This is not optional. Storing context is part of completing the task.
 ```
