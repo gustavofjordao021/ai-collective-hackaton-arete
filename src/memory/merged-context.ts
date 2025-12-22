@@ -9,11 +9,25 @@
  */
 
 import { getAuthState } from '../supabase/auth';
-import { loadFactsFromCloud, loadPagesFromCloud } from '../supabase/context-sync';
+import {
+  loadFactsFromCloud,
+  loadPagesFromCloud,
+  loadIdentityFactsFromCloud,
+  type IdentityFact,
+} from '../supabase/context-sync';
 
 // Constants (match manager.js)
 const MAX_FACT_CHARS = 4000;
 const SIMILARITY_THRESHOLD = 0.7;
+const CONFIDENCE_THRESHOLD = 0.3;
+const CONFIDENCE_HALF_LIFE_DAYS = 60;
+
+// Maturity ranking (higher = more trusted)
+const MATURITY_RANK: Record<IdentityFact['maturity'], number> = {
+  proven: 3,
+  established: 2,
+  candidate: 1,
+};
 
 interface LocalFact {
   fact: string;
@@ -39,6 +53,24 @@ interface MergedPage {
   hostname: string;
   timestamp: number;
   _source: 'local' | 'cloud';
+}
+
+/**
+ * Calculate days between two dates
+ */
+function daysBetween(date1: Date | string, date2: Date): number {
+  const d1 = typeof date1 === 'string' ? new Date(date1) : date1;
+  const diffMs = Math.abs(date2.getTime() - d1.getTime());
+  return diffMs / (1000 * 60 * 60 * 24);
+}
+
+/**
+ * Calculate effective confidence with decay
+ * Uses exponential decay with 60-day half-life
+ */
+function getEffectiveConfidence(fact: IdentityFact): number {
+  const daysSince = daysBetween(fact.lastValidated, new Date());
+  return fact.confidence * Math.pow(0.5, daysSince / CONFIDENCE_HALF_LIFE_DAYS);
 }
 
 /**
@@ -140,12 +172,63 @@ export async function getMergedFacts(maxChars: number = MAX_FACT_CHARS): Promise
 
 /**
  * Get merged facts formatted for prompt injection
+ * Combines identity facts (curated, v2) with context events (raw insights)
  */
 export async function getMergedFactsForPrompt(): Promise<string> {
-  const facts = await getMergedFacts();
-  if (facts.length === 0) return '';
+  // 1. Load identity facts from identities table (if authenticated)
+  let identityFacts: IdentityFact[] = [];
+  try {
+    const authState = await getAuthState();
+    if (authState.isAuthenticated) {
+      identityFacts = await loadIdentityFactsFromCloud();
+    }
+  } catch (err) {
+    console.warn('Arete: Failed to load identity facts:', err);
+  }
 
-  return `\n\nLearned about this user:\n${facts.map((f) => `- ${f}`).join('\n')}`;
+  // 2. Filter by effective confidence > threshold
+  const validIdentityFacts = identityFacts.filter(
+    (f) => getEffectiveConfidence(f) > CONFIDENCE_THRESHOLD
+  );
+
+  // 3. Sort by maturity (proven > established > candidate)
+  validIdentityFacts.sort((a, b) => MATURITY_RANK[b.maturity] - MATURITY_RANK[a.maturity]);
+
+  // 4. Get context events (raw insights)
+  const contextFacts = await getMergedFacts();
+
+  // 5. Deduplicate context facts against identity facts (identity takes priority)
+  const dedupedContextFacts = contextFacts.filter((contextFact) => {
+    for (const identityFact of validIdentityFacts) {
+      const similarity = stringSimilarity(contextFact, identityFact.content);
+      if (similarity >= SIMILARITY_THRESHOLD) {
+        return false; // Skip this context fact, identity fact takes priority
+      }
+    }
+    return true;
+  });
+
+  // 6. Format output with sections
+  const sections: string[] = [];
+
+  // "About this user" section for identity facts
+  if (validIdentityFacts.length > 0) {
+    const identityLines = validIdentityFacts.map(
+      (f) => `- ${f.content} [${f.maturity}]`
+    );
+    sections.push(`About this user:\n${identityLines.join('\n')}`);
+  }
+
+  // "Recent learnings" section for context events
+  if (dedupedContextFacts.length > 0) {
+    const contextLines = dedupedContextFacts.map((f) => `- ${f}`);
+    sections.push(`Recent learnings:\n${contextLines.join('\n')}`);
+  }
+
+  // Return empty string if no facts at all
+  if (sections.length === 0) return '';
+
+  return `\n\n${sections.join('\n\n')}`;
 }
 
 /**

@@ -394,3 +394,45 @@ export async function loadConversationFromCloud(): Promise<ConversationMessage[]
     return [];
   }
 }
+
+// ============================================================
+// Identity Facts v2 (from identities table)
+// ============================================================
+
+export interface IdentityFact {
+  id: string;
+  content: string;
+  category: 'core' | 'expertise' | 'preference' | 'context' | 'focus';
+  maturity: 'candidate' | 'established' | 'proven';
+  confidence: number;
+  validationCount: number;
+  lastValidated: string;
+}
+
+/**
+ * Load identity facts from cloud identities table
+ * Returns curated facts with maturity/confidence metadata
+ */
+export async function loadIdentityFactsFromCloud(): Promise<IdentityFact[]> {
+  const userId = await getUserId();
+  if (!userId) return [];
+
+  const client = getClient();
+  if (!client) return [];
+
+  try {
+    const { data, error } = await client
+      .from('identities')
+      .select('data')
+      .eq('user_id', userId)
+      .single();
+
+    if (error || !data) return [];
+
+    // Extract facts array from JSONB data field
+    const identityData = data.data as { facts?: IdentityFact[] };
+    return identityData?.facts || [];
+  } catch {
+    return [];
+  }
+}
