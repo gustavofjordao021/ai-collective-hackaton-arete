@@ -25,6 +25,7 @@ import { identityHandler } from "./tools/arete-identity.js";
 import { rememberHandler } from "./tools/arete-remember.js";
 import { activityHandler } from "./tools/arete-activity.js";
 import { inferHandler } from "./tools/identity-infer.js";
+import { onboardHandler } from "./tools/arete-onboard.js";
 
 import {
   initTelemetry,
