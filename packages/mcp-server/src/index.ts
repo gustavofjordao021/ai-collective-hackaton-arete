@@ -9,6 +9,7 @@
  *   arete_remember  - Store/validate/remove facts about the user
  *   arete_activity  - Get recent browsing/interaction context
  *   arete_infer     - Learn from patterns + accept/reject candidates
+ *   arete_onboard   - Interactive interview to build user identity
  */
 
 // Load .env file before any other imports that use config
@@ -287,6 +288,89 @@ server.registerTool(
             candidate.id as string | undefined
           );
         }
+      }
+
+      return {
+        content: [
+          ...result.content,
+          { type: "text" as const, text: `\n---\n${jsonContent}` },
+        ],
+      };
+    });
+  }
+);
+
+// --- arete_onboard ---
+server.registerTool(
+  "arete_onboard",
+  {
+    title: "Onboard User Identity",
+    description:
+      "Conduct interactive interview to build user identity.\n\n" +
+      "**Use when:** User wants to set up identity or no identity exists.\n\n" +
+      "**Modes:**\n" +
+      "- start: Begin new interview (returns first question)\n" +
+      "- answer: Process user's response (returns next question or branching offer)\n" +
+      "- branch: Handle branching decision (continue exploring or complete)\n" +
+      "- status: Check if identity exists or interview is in progress\n\n" +
+      "**Flow:**\n" +
+      "1. Call with mode: 'start'\n" +
+      "2. Ask the returned question naturally\n" +
+      "3. When user responds, call with mode: 'answer', answer: 'their response'\n" +
+      "4. Repeat until branching offer appears\n" +
+      "5. Present summary and ask if they want to explore more\n" +
+      "6. Call with mode: 'branch', branchDecision: 'continue' or 'done'\n" +
+      "7. On completion, identity is saved automatically\n\n" +
+      "**Important:** Make conversation feel natural, not like a form.",
+    inputSchema: {
+      mode: z
+        .enum(["start", "answer", "branch", "status"])
+        .describe("Interview action to take"),
+      answer: z
+        .string()
+        .optional()
+        .describe("User's response to the last question (for mode: 'answer')"),
+      branchDecision: z
+        .enum(["continue", "done"])
+        .optional()
+        .describe("Whether to continue with follow-ups or complete (for mode: 'branch')"),
+      selectedQuestions: z
+        .array(z.string())
+        .optional()
+        .describe("Specific follow-up question IDs to explore (optional)"),
+    },
+  },
+  async (input) => {
+    return withTelemetry("arete_onboard", async () => {
+      const result = await onboardHandler(input);
+      const jsonContent = JSON.stringify(result.structuredContent, null, 2);
+
+      // Track interview events (using type assertion for new event types)
+      const phase = result.structuredContent.phase;
+      const trackEvent = (event: string, properties: Record<string, unknown>) => {
+        (telemetry as unknown as { track: (e: { event: string; properties: Record<string, unknown> }) => void }).track({ event, properties });
+      };
+
+      if (input.mode === "start") {
+        trackEvent("interview.started", {});
+      } else if (input.mode === "answer" && result.structuredContent.recentFacts) {
+        trackEvent("interview.question_answered", {
+          facts_extracted: result.structuredContent.recentFacts.length,
+          question_number: result.structuredContent.question?.number || 0,
+        });
+      } else if (phase === "branching") {
+        trackEvent("interview.branching_offered", {
+          suggestions_count: result.structuredContent.branching?.suggestions.length || 0,
+        });
+      } else if (input.mode === "branch") {
+        trackEvent(
+          input.branchDecision === "continue" ? "interview.branching_accepted" : "interview.branching_declined",
+          {}
+        );
+      } else if (phase === "complete") {
+        trackEvent("interview.completed", {
+          facts_extracted: result.structuredContent.completion?.factsExtracted || 0,
+        });
       }
 
       return {

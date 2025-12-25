@@ -23,6 +23,8 @@ export {
   FactCategorySchema,
   MaturitySchema,
   FactSourceSchema,
+  VisibilitySchema,
+  filterFactsByVisibility,
   createIdentityFact,
   createEmptyIdentityV2,
   migrateV1ToV2,
@@ -37,6 +39,7 @@ export {
   type FactCategory,
   type Maturity,
   type FactSource,
+  type Visibility,
 } from "./identity-v2.js";
 
 // Context schema
