@@ -72,7 +72,14 @@ server.registerTool(
       "- task: Focus on facts relevant to a specific task (optional)\n" +
       "- format: 'json' (default) or 'prompt' for formatted text\n" +
       "- maxFacts: Limit number of facts (default: 10)\n" +
-      "- minConfidence: Filter low-confidence facts (default: 0.3)",
+      "- minConfidence: Filter low-confidence facts (default: 0.3)\n\n" +
+      "**Task-Aware Relevance:**\n" +
+      "When you pass a `task`, facts are scored by semantic relevance and returned in order of usefulness.\n" +
+      "- 'help me with React' → surfaces frontend/JS expertise\n" +
+      "- 'write a cover letter' → surfaces role, company, career goals\n" +
+      "- 'plan my trip' → surfaces location preferences, travel context\n\n" +
+      "**Best practice:** Always infer a task from the user's first message and pass it.\n" +
+      "Even vague messages like 'hey' can use task='general greeting'.",
     inputSchema: {
       task: z
         .string()
@@ -307,21 +314,22 @@ server.registerTool(
     title: "Onboard User Identity",
     description:
       "Conduct interactive interview to build user identity.\n\n" +
-      "**Use when:** User wants to set up identity or no identity exists.\n\n" +
-      "**Modes:**\n" +
-      "- start: Begin new interview (returns first question)\n" +
-      "- answer: Process user's response (returns next question or branching offer)\n" +
-      "- branch: Handle branching decision (continue exploring or complete)\n" +
-      "- status: Check if identity exists or interview is in progress\n\n" +
+      "**CRITICAL: Always check `nextAction.mode` in the response to know what to call next.**\n\n" +
+      "The response includes `nextAction: { mode, description }` that tells you exactly which mode to use. " +
+      "Don't guess based on phase - just follow nextAction.\n\n" +
+      "**Extract facts yourself for faster performance:**\n" +
+      "When calling mode='answer', include extractedFacts to avoid extra LLM call.\n" +
+      "- EXPLICIT: 'I'm a PM' → { category: 'core', content: 'Product Manager', confidence: 1.0 }\n" +
+      "- IMPLICIT: 'Building with Next.js' → { category: 'expertise', content: 'React/Next.js', confidence: 0.8 }\n" +
+      "- Categories: core (role/name), expertise (skills), preference (style), context (company), focus (projects)\n\n" +
       "**Flow:**\n" +
-      "1. Call with mode: 'start'\n" +
-      "2. Ask the returned question naturally\n" +
-      "3. When user responds, call with mode: 'answer', answer: 'their response'\n" +
-      "4. Repeat until branching offer appears\n" +
-      "5. Present summary and ask if they want to explore more\n" +
-      "6. Call with mode: 'branch', branchDecision: 'continue' or 'done'\n" +
-      "7. On completion, identity is saved automatically\n\n" +
-      "**Important:** Make conversation feel natural, not like a form.",
+      "1. mode='start' → returns question + nextAction.mode='answer'\n" +
+      "2. Ask question, get response, extract facts\n" +
+      "3. mode='answer' with answer + extractedFacts → returns next step + nextAction\n" +
+      "4. Follow nextAction.mode for each subsequent call\n" +
+      "5. When nextAction.mode='branch', call mode='branch' with branchDecision\n" +
+      "6. When nextAction.mode='complete', interview is done\n\n" +
+      "Make conversation feel natural, not like a form.",
     inputSchema: {
       mode: z
         .enum(["start", "answer", "branch", "status"])
@@ -330,6 +338,17 @@ server.registerTool(
         .string()
         .optional()
         .describe("User's response to the last question (for mode: 'answer')"),
+      extractedFacts: z
+        .array(
+          z.object({
+            category: z.enum(["core", "expertise", "preference", "context", "focus"]),
+            content: z.string(),
+            confidence: z.number().min(0).max(1).optional(),
+            visibility: z.enum(["public", "trusted"]).optional(),
+          })
+        )
+        .optional()
+        .describe("Facts extracted from the answer by host LLM (recommended for performance)"),
       branchDecision: z
         .enum(["continue", "done"])
         .optional()
@@ -351,16 +370,23 @@ server.registerTool(
         (telemetry as unknown as { track: (e: { event: string; properties: Record<string, unknown> }) => void }).track({ event, properties });
       };
 
+      const timing = result.structuredContent.timing;
+
       if (input.mode === "start") {
         trackEvent("interview.started", {});
       } else if (input.mode === "answer" && result.structuredContent.recentFacts) {
         trackEvent("interview.question_answered", {
           facts_extracted: result.structuredContent.recentFacts.length,
           question_number: result.structuredContent.question?.number || 0,
+          extraction_source: timing?.source || "unknown",
+          extraction_ms: timing?.extractionMs,
+          total_ms: timing?.totalMs,
         });
       } else if (phase === "branching") {
         trackEvent("interview.branching_offered", {
           suggestions_count: result.structuredContent.branching?.suggestions.length || 0,
+          extraction_source: timing?.source || "unknown",
+          total_ms: timing?.totalMs,
         });
       } else if (input.mode === "branch") {
         trackEvent(

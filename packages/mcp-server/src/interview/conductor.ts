@@ -11,6 +11,7 @@
 
 import type { IdentityV2, IdentityFact, FactCategory } from "@arete/core";
 import { createEmptyIdentityV2, createIdentityFact } from "@arete/core";
+import { similarity } from "../tools/fuzzy-match.js";
 import {
   type InterviewState,
   type InterviewQuestion,
@@ -101,6 +102,41 @@ export class InterviewConductor {
     this.state.allFacts.push(...extraction.facts);
 
     // Determine next step
+    return this.determineNextStep();
+  }
+
+  /**
+   * Process an answer with pre-extracted facts (fast path - no extraction LLM call)
+   * Note: Still async because branching generation at end requires LLM
+   */
+  async answerWithFacts(answer: string, facts: ExtractedFact[]): Promise<ConductorResponse> {
+    const startTime = Date.now();
+
+    const currentQuestion = this.getCurrentQuestion();
+    if (!currentQuestion) {
+      throw new Error("No question pending");
+    }
+
+    // Create the exchange record with provided facts
+    const exchange: InterviewExchange = {
+      question: currentQuestion,
+      answer,
+      extractedFacts: facts,
+      answeredAt: new Date().toISOString(),
+      durationMs: Date.now() - startTime,
+    };
+
+    // Add to appropriate exchange list
+    if (currentQuestion.phase === "core") {
+      this.state.coreExchanges.push(exchange);
+    } else {
+      this.state.branchExchanges.push(exchange);
+    }
+
+    // Accumulate facts
+    this.state.allFacts.push(...facts);
+
+    // Determine next step (uses existing async method)
     return this.determineNextStep();
   }
 
@@ -464,10 +500,30 @@ export function interviewOutputToIdentityV2(
   }
 
   // Add company/location as context facts
+  // Strip any existing prefixes before adding canonical one
+  const KNOWN_PREFIXES = ["works at", "based in", "located in", "lives in"];
+
+  function stripPrefixes(value: string): string {
+    let result = value.trim();
+    let changed = true;
+    // Keep stripping until no more prefixes found (handles nested prefixes)
+    while (changed) {
+      changed = false;
+      for (const prefix of KNOWN_PREFIXES) {
+        if (result.toLowerCase().startsWith(prefix + " ")) {
+          result = result.slice(prefix.length + 1).trim();
+          changed = true;
+        }
+      }
+    }
+    return result;
+  }
+
   if (output.identity.core.company) {
+    const cleanCompany = stripPrefixes(output.identity.core.company);
     identity.facts.push(createIdentityFact({
       category: "context",
-      content: `Works at ${output.identity.core.company}`,
+      content: `Works at ${cleanCompany}`,
       source: "manual",
       confidence: 1.0,
       visibility: "trusted",
@@ -475,14 +531,29 @@ export function interviewOutputToIdentityV2(
   }
 
   if (output.identity.core.location) {
+    const cleanLocation = stripPrefixes(output.identity.core.location);
     identity.facts.push(createIdentityFact({
       category: "context",
-      content: `Based in ${output.identity.core.location}`,
+      content: `Based in ${cleanLocation}`,
       source: "manual",
       confidence: 1.0,
       visibility: "trusted",
     }));
   }
+
+  // Deduplicate facts by semantic similarity (0.85 threshold)
+  // Same-category only to avoid false positives across categories
+  const kept: typeof identity.facts = [];
+  for (const fact of identity.facts) {
+    const isDuplicate = kept.some(existing =>
+      existing.category === fact.category &&
+      similarity(existing.content, fact.content) > 0.85
+    );
+    if (!isDuplicate) {
+      kept.push(fact);
+    }
+  }
+  identity.facts = kept;
 
   return identity;
 }

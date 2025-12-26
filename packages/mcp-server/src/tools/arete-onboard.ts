@@ -14,7 +14,7 @@
  * 7. Tool saves identity.json
  */
 
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs";
+import { existsSync, readFileSync, writeFileSync, mkdirSync, unlinkSync } from "fs";
 import { homedir } from "os";
 import { join } from "path";
 import { loadConfig, createCLIClient, type IdentityV2 } from "@arete/core";
@@ -65,8 +65,7 @@ function loadInterviewState(): InterviewState | null {
 
 function clearInterviewState(): void {
   if (existsSync(INTERVIEW_STATE_FILE)) {
-    const fs = require("fs");
-    fs.unlinkSync(INTERVIEW_STATE_FILE);
+    unlinkSync(INTERVIEW_STATE_FILE);
   }
 }
 
@@ -102,6 +101,13 @@ export interface OnboardInput {
   answer?: string;
   branchDecision?: "continue" | "done";
   selectedQuestions?: string[];
+  /** Pre-extracted facts from host LLM (skips Haiku call) */
+  extractedFacts?: Array<{
+    category: "core" | "expertise" | "preference" | "context" | "focus";
+    content: string;
+    confidence?: number;
+    visibility?: "public" | "trusted";
+  }>;
 }
 
 export interface OnboardOutput {
@@ -140,6 +146,19 @@ export interface OnboardOutput {
 
   // Error info
   error?: string;
+
+  // Timing info for debugging/telemetry
+  timing?: {
+    totalMs: number;
+    extractionMs?: number;
+    source: "host" | "haiku";
+  };
+
+  // Explicit next action to eliminate state machine confusion
+  nextAction?: {
+    mode: "answer" | "branch" | "complete" | "start";
+    description: string;
+  };
 }
 
 export interface OnboardToolResult {
@@ -168,6 +187,7 @@ export async function onboardHandler(input: OnboardInput): Promise<OnboardToolRe
           summary: `Identity already configured with ${existingIdentity.facts.length} facts.`,
         },
         instructions: "User already has an identity. Use arete_identity to retrieve it.",
+        nextAction: { mode: "complete", description: "Identity exists - no action needed" },
       });
     }
 
@@ -176,6 +196,7 @@ export async function onboardHandler(input: OnboardInput): Promise<OnboardToolRe
         success: true,
         phase: "questioning",
         instructions: `Interview in progress (${pendingInterview.coreExchanges.length}/${CORE_QUESTIONS.length} questions answered). Call with mode: "answer" to continue.`,
+        nextAction: { mode: "answer", description: "Continue interview with user's response" },
       });
     }
 
@@ -183,6 +204,7 @@ export async function onboardHandler(input: OnboardInput): Promise<OnboardToolRe
       success: true,
       phase: "starting",
       instructions: "No identity configured. Call with mode: 'start' to begin the interview.",
+      nextAction: { mode: "start", description: "Begin the onboarding interview" },
     });
   }
 
@@ -193,6 +215,7 @@ export async function onboardHandler(input: OnboardInput): Promise<OnboardToolRe
       phase: "error",
       error: "ANTHROPIC_API_KEY not set. Cannot conduct interview.",
       instructions: "Ask user to set ANTHROPIC_API_KEY environment variable.",
+      nextAction: { mode: "start", description: "Set API key, then call mode='start'" },
     });
   }
 
@@ -212,6 +235,7 @@ export async function onboardHandler(input: OnboardInput): Promise<OnboardToolRe
           "User already has an identity configured. " +
           "Ask if they want to add to it or start fresh. " +
           "To start fresh, they can delete ~/.arete/identity.json first.",
+        nextAction: { mode: "complete", description: "Identity exists - no action needed" },
       });
     }
 
@@ -237,6 +261,7 @@ export async function onboardHandler(input: OnboardInput): Promise<OnboardToolRe
           "Ask this question naturally and conversationally. " +
           "Wait for the user's response, then call arete_onboard with mode: 'answer' and their response. " +
           "Don't explain that you're conducting an interview - just have a natural conversation.",
+        nextAction: { mode: "answer", description: "Wait for user response, then call with mode='answer'" },
       });
     }
 
@@ -245,6 +270,7 @@ export async function onboardHandler(input: OnboardInput): Promise<OnboardToolRe
       phase: "error",
       error: "Unexpected state after start",
       instructions: "Something went wrong. Try starting again.",
+      nextAction: { mode: "start", description: "Try starting again" },
     });
   }
 
@@ -256,6 +282,7 @@ export async function onboardHandler(input: OnboardInput): Promise<OnboardToolRe
         phase: "error",
         error: "No answer provided",
         instructions: "Call with mode: 'answer' and include the user's response in 'answer' field.",
+        nextAction: { mode: "answer", description: "Provide user's answer in 'answer' field" },
       });
     }
 
@@ -280,15 +307,44 @@ export async function onboardHandler(input: OnboardInput): Promise<OnboardToolRe
         phase: "error",
         error: "No active interview. Start one first.",
         instructions: "Call with mode: 'start' to begin a new interview.",
+        nextAction: { mode: "start", description: "Begin a new interview" },
       });
     }
 
-    // Process the answer
-    const response = await conductor.answer(input.answer);
+    // Process the answer - use fast path if extractedFacts provided
+    const startTime = Date.now();
+    let response;
+    let extractionSource: "host" | "haiku";
+    let extractionMs: number | undefined;
+
+    if (input.extractedFacts && input.extractedFacts.length > 0) {
+      // Fast path: use pre-extracted facts from host LLM
+      const facts = input.extractedFacts.map(f => ({
+        category: f.category,
+        content: f.content,
+        confidence: f.confidence ?? 0.8,
+        visibility: f.visibility ?? "trusted" as const,
+        evidence: "Extracted by host LLM",
+      }));
+      response = await conductor.answerWithFacts(input.answer, facts);
+      extractionSource = "host";
+      extractionMs = 0;
+    } else {
+      // Slow path: extract via Haiku (fallback for non-Claude hosts)
+      const extractionStart = Date.now();
+      response = await conductor.answer(input.answer);
+      extractionMs = Date.now() - extractionStart;
+      extractionSource = "haiku";
+    }
+
+    const totalMs = Date.now() - startTime;
     saveInterviewState(response.state);
 
     // Format recent facts for display
     const recentFacts = response.newFacts.slice(-5).map(f => f.content);
+
+    // Build timing info
+    const timing = { totalMs, extractionMs, source: extractionSource };
 
     if (response.next.type === "ask_question") {
       const questionNumber = response.state.coreExchanges.length + 1;
@@ -304,11 +360,13 @@ export async function onboardHandler(input: OnboardInput): Promise<OnboardToolRe
           intent: response.next.question.intent,
         },
         recentFacts,
+        timing,
         instructions:
           "Ask this question naturally. " +
           "The 'recentFacts' shows what was learned from the last answer - " +
           "you can acknowledge these naturally if relevant. " +
-          "Wait for response, then call with mode: 'answer'.",
+          "Wait for response, then call with mode: 'answer' and include extractedFacts.",
+        nextAction: { mode: "answer", description: "Wait for user response, then call with mode='answer'" },
       });
     }
 
@@ -325,11 +383,13 @@ export async function onboardHandler(input: OnboardInput): Promise<OnboardToolRe
           })),
         },
         recentFacts,
+        timing,
         instructions:
           "Present the summary of what you've learned, then offer to explore the suggested follow-up questions. " +
           "Make it feel natural: 'I've learned X about you. I'm curious about [suggestions]. Want to explore these, or is that enough for now?' " +
           "If they want to continue, call with mode: 'branch', branchDecision: 'continue'. " +
           "If they're done, call with mode: 'branch', branchDecision: 'done'.",
+        nextAction: { mode: "branch", description: "Wait for user decision, then call with mode='branch' and branchDecision" },
       });
     }
 
@@ -342,6 +402,7 @@ export async function onboardHandler(input: OnboardInput): Promise<OnboardToolRe
       phase: "error",
       error: "Unexpected response type",
       instructions: "Something went wrong. Try starting a new interview.",
+      nextAction: { mode: "start", description: "Start a new interview" },
     });
   }
 
@@ -354,6 +415,7 @@ export async function onboardHandler(input: OnboardInput): Promise<OnboardToolRe
         phase: "error",
         error: "No active interview",
         instructions: "Call with mode: 'start' to begin.",
+        nextAction: { mode: "start", description: "Begin a new interview" },
       });
     }
 
@@ -387,6 +449,7 @@ export async function onboardHandler(input: OnboardInput): Promise<OnboardToolRe
           "Ask this follow-up question naturally. " +
           "Reference what they said earlier if relevant. " +
           "Wait for response, then call with mode: 'answer'.",
+        nextAction: { mode: "answer", description: "Wait for user response, then call with mode='answer'" },
       });
     }
 
@@ -399,6 +462,7 @@ export async function onboardHandler(input: OnboardInput): Promise<OnboardToolRe
       phase: "error",
       error: "Unexpected response after branch decision",
       instructions: "Something went wrong.",
+      nextAction: { mode: "start", description: "Start a new interview" },
     });
   }
 
@@ -407,6 +471,7 @@ export async function onboardHandler(input: OnboardInput): Promise<OnboardToolRe
     phase: "error",
     error: `Unknown mode: ${input.mode}`,
     instructions: "Use mode: 'start', 'answer', 'branch', or 'status'.",
+    nextAction: { mode: "start", description: "Start with mode='start'" },
   });
 }
 
@@ -458,6 +523,7 @@ async function handleCompletion(
       "Interview complete! Summarize what you learned about them in a friendly way. " +
       "Mention that their identity is now saved and will personalize future conversations. " +
       "Invite them to start chatting about anything - you now know who they are.",
+    nextAction: { mode: "complete", description: "Interview done - no further action needed" },
   });
 }
 
