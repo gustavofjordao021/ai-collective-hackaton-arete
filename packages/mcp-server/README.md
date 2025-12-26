@@ -34,9 +34,10 @@ That's it. No repo cloning, no building.
 ## Commands
 
 ```bash
-npx arete-mcp-server setup              # Interactive signup
+npx arete-mcp-server setup              # Interactive signup + install Claude Code hooks
 npx arete-mcp-server setup EMAIL        # Non-interactive signup
 npx arete-mcp-server                    # Start MCP server
+npx arete-mcp-server extract PATH       # Extract facts from transcript (used by hooks)
 npx arete-mcp-server --help             # Show help
 ```
 
@@ -48,6 +49,7 @@ npx arete-mcp-server --help             # Show help
 | `arete_remember` | Store, validate, or remove facts (auto-detects category) |
 | `arete_activity` | Get recent browsing/interaction context |
 | `arete_infer` | Extract facts from activity patterns + accept/reject candidates |
+| `arete_onboard` | Interactive interview to build identity (3-5 min) |
 
 ## How It Works
 
@@ -107,6 +109,30 @@ This is not optional. Storing context is part of completing the task.
 ```
 
 Without this, you get tools but Claude won't proactively use them.
+
+## Claude Code: Automatic Context Capture
+
+For **Claude Code** users, setup auto-installs hooks that make context capture automatic — no system prompt needed:
+
+```bash
+npx arete-mcp-server setup
+# ✅ Detects Claude Code and installs hooks to ~/.claude/settings.json
+```
+
+**Hooks installed:**
+
+| Hook | When | What |
+|------|------|------|
+| `SessionStart` | New conversation | Injects "call arete_identity" instruction |
+| `PreCompact` | Before context compression | Extracts facts via Haiku |
+| `SessionEnd` | Session ends | Final extraction of durable facts |
+
+**How it works:**
+1. Hooks read the conversation transcript (JSONL)
+2. Call Claude Haiku to extract durable facts (role, skills, preferences)
+3. Merge into `~/.arete/identity.json` with semantic deduplication
+
+**Check extraction logs:** `cat ~/.arete/extraction.log`
 
 ## FAQ
 
